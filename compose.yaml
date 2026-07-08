@@ -1,0 +1,33 @@
+networks:
+  vpn_simulation:
+    driver: bridge
+
+services:
+  # 1. Источник истины — База данных
+  postgres:
+    image: postgres:16-alpine
+    container_name: sim_db
+    ports:
+      - "127.0.0.1:5432:5432" # Пробрасываем порт наружу, чтобы локальный vpn-core дотянулся до БД
+    environment:
+      POSTGRES_USER: master_user
+      POSTGRES_PASSWORD: master_password_secure
+      POSTGRES_DB: vpn_core
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - vpn_simulation
+
+  # 2. Симулируемый Воркер (Контейнер sing-box)
+  sing-box-worker:
+    image: ghcr.io/sagernet/sing-box:latest
+    container_name: sing-box-backup
+    privileged: true
+    ports:
+      - "127.0.0.1:2026:2026"
+      - "127.0.0.1:8444:8443"
+    volumes:
+      - ./sim_etc_singbox:/etc/sing-box
+    command: run -c /etc/sing-box/config.json
+    networks:
+      - vpn_simulation

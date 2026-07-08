@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vpn_master_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: master_user
+      POSTGRES_PASSWORD: master_password_secure
+      POSTGRES_DB: vpn_core
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+volumes:
+  pg_data:

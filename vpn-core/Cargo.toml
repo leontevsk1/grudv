@@ -1,0 +1,36 @@
+[package]
+name = "vpn-core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+sqlx = { version = "0.8.1", features = [
+    "postgres",
+    "runtime-tokio",
+    "macros",
+    "chrono",
+    "uuid",
+] }
+sha1 = "0.11.0"
+hex = "0.4.3"
+dotenvy = "0.15.7"
+tokio = { version = "1.39", features = ["full", "rt-multi-thread", "macros"] }
+# Сериализация состояний (нужна для хранения State в базе)
+serde = { version = "1.0", features = ["derive"] }
+
+# Асинхронный рантайм и веб-фреймворк
+axum = "0.8.8"
+
+# Работа с JSON (для вебхуков и API 3x-ui)
+serde_json = "1.0"
+
+# HTTP-клиент для походов в 3x-ui
+reqwest = { version = "0.12", features = ["json", "cookies"] }
+
+# Типы данных (совместимые с sqlx и serde)
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.10", features = ["v4", "serde"] }
+
+# Логирование и конфиги (оставляем те же, что и в tg_gateway для консистентности)
+log = "0.4"
+pretty_env_logger = "0.5"

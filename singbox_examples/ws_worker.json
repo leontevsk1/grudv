@@ -1,0 +1,103 @@
+{
+  "log": {
+    "level": "info"
+  },
+  "inbounds": [
+    {
+      "type": "vless",
+      "tag": "in-vless-xhttp",
+      "listen": "127.0.0.1",
+      "listen_port": 2026,
+      "users": [
+        { "name": "premium", "uuid": "<PREMIUM_VLESS_UUID>" },
+        { "name": "free", "uuid": "<FREE_VLESS_UUID>" }
+      ],
+      "transport": {
+        "type": "httpupgrade",
+        "path": "/your-secret-health-path"
+      }
+    },
+    {
+      "type": "naive",
+      "tag": "in-naive",
+      "listen": "127.0.0.1",
+      "listen_port": 2027,
+      "users": [
+        { "name": "premium", "username": "<PREMIUM_NAIVE_USER>", "password": "<PREMIUM_NAIVE_PASS>" },
+        { "name": "free", "username": "<FREE_NAIVE_USER>", "password": "<FREE_NAIVE_PASS>" }
+      ]
+    },
+    {
+      "type": "hysteria2",
+      "tag": "in-hysteria2",
+      "listen": "::",
+      "listen_port": 8443,
+      "users": [
+        { "name": "premium", "password": "<PREMIUM_HY2_PASSWORD>" },
+        { "name": "free", "password": "<FREE_HY2_PASSWORD>" }
+      ],
+      "obfs": {
+        "type": "salamander",
+        "password": "<OBFS_SHARED_PASSWORD>"
+      },
+      "tls": {
+        "enabled": true,
+        "certificate_path": "/path/to/fullchain.pem",
+        "key_path": "/path/to/privkey.pem",
+        "alpn": ["h3"]
+      }
+    },
+    {
+      "type": "tuic",
+      "tag": "in-tuic",
+      "listen": "::",
+      "listen_port": 443,
+      "users": [
+        { "name": "premium", "uuid": "<PREMIUM_TUIC_UUID>", "password": "<PREMIUM_TUIC_PASSWORD>" },
+        { "name": "free", "uuid": "<FREE_TUIC_UUID>", "password": "<FREE_TUIC_PASSWORD>" }
+      ],
+      "congestion_control": "bbr",
+      "tls": {
+        "enabled": true,
+        "certificate_path": "/path/to/fullchain.pem",
+        "key_path": "/path/to/privkey.pem",
+        "alpn": ["h3"]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "Direct-Premium"
+    },
+    {
+      "type": "direct",
+      "tag": "Direct-Free",
+      "routing_mark": 100
+    },
+    {
+      "type": "block",
+      "tag": "Block"
+    }
+  ],
+  "route": {
+    "rules": [
+      {
+        "ip_is_private": true,
+        "action": "route",
+        "outbound": "Block"
+      },
+      {
+        "user": ["premium"],
+        "action": "route",
+        "outbound": "Direct-Premium"
+      },
+      {
+        "user": ["free"],
+        "action": "route",
+        "outbound": "Direct-Free"
+      }
+    ],
+    "final": "Block"
+  }
+}

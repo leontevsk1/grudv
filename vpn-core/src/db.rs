@@ -135,3 +135,9 @@ pub async fn get_node_by_id(pool: &PgPool, id: i32) -> Result<Option<Node>, sqlx
         .fetch_optional(pool)
         .await
 }
+
+pub async fn get_all_nodes(pool: &PgPool) -> Result<Vec<Node>, sqlx::Error> {
+    sqlx::query_as!(Node, "SELECT * FROM nodes WHERE status = 'active'")
+        .fetch_all(pool)
+        .await
+}

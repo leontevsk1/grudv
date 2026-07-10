@@ -83,13 +83,8 @@ func main() {
 				sb.WriteString("⚠️ Трафик искусственно замедлен ядрами Linux (tc троттлинг). Оплатите Premium для высокой скорости.\n")
 			}
 
-			sb.WriteString("\n Ваши ключи подключения:\n")
-			if user.VlessUUID != nil {
-				sb.WriteString(fmt.Sprintf("VLESS (Free/Premium):\n`vless://%s@%s:443?encryption=none&security=tls&type=httpupgrade`\n\n", *user.VlessUUID, "node_address"))
-			}
-			if user.Tier == "premium" && user.Hy2Password != nil {
-				sb.WriteString(fmt.Sprintf("Hysteria 2 (Premium):\n`hy2://%s@%s:8443`\n", *user.Hy2Password, "node_address"))
-			}
+			sb.WriteString(fmt.Sprintf("\nСсылка на подписку:\n`%s/api/sub/%d`\n", core.MasterURL, chatID))
+			sb.WriteString("\nЭта ссылка работает со всеми современными VPN-клиентами (sing-box, xray и т.д.)")
 
 			msgOut := tgbotapi.NewMessage(chatID, sb.String())
 			msgOut.ParseMode = "Markdown"

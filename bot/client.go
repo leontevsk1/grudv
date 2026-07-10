@@ -103,3 +103,36 @@ func (c *CoreClient) ApprovePayment(paymentID int) error {
 	}
 	return nil
 }
+
+func (c *CoreClient) RejectPayment(paymentID int) error {
+	status, err := c.sendPost(fmt.Sprintf("/api/v1/payments/%d/reject", paymentID), nil)
+	if err != nil {
+		return err
+	}
+	if status != http.StatusOK {
+		return fmt.Errorf("master returned status: %d", status)
+	}
+	return nil
+}
+
+func (c *CoreClient) DeleteUser(tgID int64) error {
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/api/v1/users/%d", c.MasterURL, tgID), nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.BotSecret)
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("user not found")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("master returned status: %d", resp.StatusCode)
+	}
+	return nil
+}

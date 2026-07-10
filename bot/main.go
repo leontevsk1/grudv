@@ -97,7 +97,7 @@ func main() {
 
 			// Отправка админу карточки на подтверждение
 			adminMsg := tgbotapi.NewMessage(adminID, fmt.Sprintf("User %d утверждает, что оплатил Premium.\nID транзакции: #%d", chatID, paymentCounter))
-			
+
 			inlineKeyboard := tgbotapi.NewInlineKeyboardMarkup(
 				tgbotapi.NewInlineKeyboardRow(
 					tgbotapi.NewInlineKeyboardButtonData("Подтвердить", fmt.Sprintf("approve_%d_%d", paymentCounter, chatID)),

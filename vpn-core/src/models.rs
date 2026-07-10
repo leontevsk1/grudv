@@ -34,13 +34,6 @@ pub struct Node {
     pub upstream_node_id: Option<i32>,
 }
 
-#[derive(Debug, Serialize, FromRow)]
-pub struct PaymentRequest {
-    pub id: i32,
-    pub tg_id: i64,
-    pub status: String,
-    pub created_at: Option<NaiveDateTime>,
-}
 
 // -----------------------------------------------------------------
 // МОДЕЛИ ВХОДЯЩИХ ЗАПРОСОВ (API REQUESTS)

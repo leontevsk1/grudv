@@ -73,8 +73,8 @@ func fetchAndApplyConfig(cfg *Config) {
 		return
 	}
 
-	configPath := "/etc/sing-box/config.json"
-	
+	configPath := cfg.ConfigPath
+
 	// Проверяем, изменился ли конфиг, чтобы зря не дергать Podman
 	oldConfigBytes, err := os.ReadFile(configPath)
 	if err == nil && bytes.Equal(oldConfigBytes, newConfigBytes) {

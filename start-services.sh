@@ -25,24 +25,19 @@ done
 echo "✅ PostgreSQL is ready"
 echo "✅ sing-box worker is running"
 
+# Initialize test node in database
+echo "📝 Initializing test node in database..."
+NODE_TOKEN="${NODE_JOIN_TOKEN:-test-join-token-123}"
+podman exec sim_db psql -U master_user -d vpn_core -c \
+  "INSERT INTO nodes (name, address, node_type, status, join_token) \
+   VALUES ('test-worker-1', '127.0.0.1:8444', 'reality', 'active', '$NODE_TOKEN') \
+   ON CONFLICT (join_token) DO NOTHING;"
+
 # 2. Start Rust vpn-core
 echo "🦀 Starting vpn-core (Rust)..."
 cd "$PROJECT_DIR/vpn-core"
 cargo build --release 2>&1 | grep -E "(Compiling|Finished|error)" &
 CORE_PID=$!
-cd "$PROJECT_DIR"
-
-# 3. Start Go services (bot, nup)
-echo "🐹 Starting bot (Go)..."
-cd "$PROJECT_DIR/bot"
-go run . &
-BOT_PID=$!
-cd "$PROJECT_DIR"
-
-echo "🐹 Starting nup (Go)..."
-cd "$PROJECT_DIR/nup"
-go run . &
-NUP_PID=$!
 cd "$PROJECT_DIR"
 
 # Wait for Core to finish building
@@ -55,7 +50,29 @@ if [ -f "$PROJECT_DIR/vpn-core/target/release/vpn-core" ] || [ -f "$PROJECT_DIR/
   CORE_RUN_PID=$!
   cd "$PROJECT_DIR"
   echo "✅ vpn-core is running (PID: $CORE_RUN_PID)"
+
+  # Wait for vpn-core to start listening
+  echo "⏳ Waiting for vpn-core to start..."
+  sleep 3
+  until nc -z 127.0.0.1 8443 2>/dev/null; do
+    echo "Waiting for vpn-core on port 8443..."
+    sleep 1
+  done
+  echo "✅ vpn-core is listening"
 fi
+
+# 3. Start Go services (bot, nup) - только после vpn-core
+echo "🐹 Starting bot (Go)..."
+cd "$PROJECT_DIR/bot"
+go run . &
+BOT_PID=$!
+cd "$PROJECT_DIR"
+
+echo "🐹 Starting nup (Go)..."
+cd "$PROJECT_DIR/nup"
+NUP_CONFIG_PATH="$PROJECT_DIR/sim_etc_singbox/config.json" go run . &
+NUP_PID=$!
+cd "$PROJECT_DIR"
 
 echo ""
 echo "=================================="

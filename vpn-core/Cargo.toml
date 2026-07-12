@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-sqlx = { version = "0.8.1", features = [
+sqlx = { version = "0.8.1", default-features = false, features = [
     "postgres",
-    "runtime-tokio",
+    "runtime-tokio-rustls",
     "macros",
     "chrono",
     "uuid",
@@ -25,7 +25,7 @@ axum = "0.8.8"
 serde_json = "1.0"
 
 # HTTP-клиент для походов в 3x-ui
-reqwest = { version = "0.12", features = ["json", "cookies"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "cookies", "rustls-tls"] }
 
 # Типы данных (совместимые с sqlx и serde)
 chrono = { version = "0.4", features = ["serde"] }

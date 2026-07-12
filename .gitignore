@@ -2,3 +2,5 @@
 sim_etc_singbox
 target
 build
+*.bak
+spec.md

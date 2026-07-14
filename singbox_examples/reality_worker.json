@@ -8,8 +8,6 @@
       "tag": "in-vless-reality",
       "listen": "::",
       "listen_port": 443,
-      "sniff": true,
-      "sniff_override_destination": true,
       "users": [
         {
           "name": "premium",
@@ -53,10 +51,6 @@
           "password": "<FREE_HY2_PASSWORD>"
         }
       ],
-      "obfs": {
-        "type": "salamander",
-        "password": "<OBFS_SHARED_PASSWORD>"
-      },
       "tls": {
         "enabled": true,
         "alpn": ["h3"],

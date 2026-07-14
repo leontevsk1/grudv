@@ -5,7 +5,6 @@ import (
 	"fmt"
 )
 
-// Входные DTO от Мастера
 type MasterUser struct {
 	TgID          int64   `json:"tg_id"`
 	Tier          string  `json:"tier"`
@@ -19,12 +18,12 @@ type MasterUser struct {
 }
 
 type MasterNode struct {
-	ID             int     `json:"id"`
-	Name           string  `json:"name"`
-	Address        string  `json:"address"`
-	NodeType       string  `json:"node_type"`
-	UpstreamNodeID *int    `json:"upstream_node_id"`
-	JoinToken      string  `json:"join_token"`
+	ID             int    `json:"id"`
+	Name           string `json:"name"`
+	Address        string `json:"address"`
+	NodeType       string `json:"node_type"`
+	UpstreamNodeID *int   `json:"upstream_node_id"`
+	JoinToken      string `json:"join_token"`
 }
 
 type MasterConfigResponse struct {
@@ -98,8 +97,6 @@ func buildRealityConfig(data *MasterConfigResponse) ([]byte, error) {
 				"tag": "in-vless-reality",
 				"listen": "::",
 				"listen_port": 443,
-				"sniff": true,
-				"sniff_override_destination": true,
 				"tls": {
 					"enabled": true,
 					"server_name": "telemetry.mozilla.org",
@@ -159,7 +156,7 @@ func buildRealityConfig(data *MasterConfigResponse) ([]byte, error) {
 
 	// Прямолинейно внедряем пользователей в inbounds по индексам шаблона
 	inbounds := configMap["inbounds"].([]any)
-	
+
 	vlessInbound := inbounds[0].(map[string]any)
 	vlessInbound["users"] = vlessUsers
 
@@ -298,8 +295,6 @@ func buildRelayConfig(data *MasterConfigResponse) ([]byte, error) {
 				"tag": "in-vless-reality",
 				"listen": "::",
 				"listen_port": 443,
-				"sniff": true,
-				"sniff_override_destination": true,
 				"tls": {
 					"enabled": true,
 					"server_name": "telemetry.mozilla.org",

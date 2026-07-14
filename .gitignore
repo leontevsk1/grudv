@@ -7,3 +7,4 @@ spec.md
 vendor
 .sqlx
 pg_data
+docs/

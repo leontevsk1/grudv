@@ -299,74 +299,61 @@ pub async fn get_nup_config(
 // ПОДПИСКА (Для клиентов sing-box/xray)
 // -----------------------------------------------------------------
 
-pub async fn get_sub(
-    State(state): State<AppState>,
-    Path(tg_id): Path<i64>,
-) -> impl IntoResponse {
+pub async fn get_sub(State(state): State<AppState>, Path(tg_id): Path<i64>) -> impl IntoResponse {
     match db::get_all_nodes(&state.db).await {
-        Ok(nodes) => {
-            match db::get_user(&state.db, tg_id).await {
-                Ok(Some(user)) => {
-                    if let Some(expire_at) = user.expire_at {
-                        if expire_at < chrono::Local::now().naive_local() {
-                            return StatusCode::FORBIDDEN.into_response();
+        Ok(nodes) => match db::get_user(&state.db, tg_id).await {
+            Ok(Some(user)) => {
+                if let Some(expire_at) = user.expire_at
+                    && expire_at < chrono::Local::now().naive_local()
+                {
+                    return StatusCode::FORBIDDEN.into_response();
+                }
+
+                let mut configs = Vec::new();
+                for node in nodes {
+                    if user.tier == "free" {
+                        let config = format!(
+                            "vless://{}@{}?encryption=none&security=tls&type=httpupgrade&mark=100",
+                            user.vless_uuid.unwrap_or_default(),
+                            node.address
+                        );
+                        configs.push(config);
+                    } else {
+                        let config = format!(
+                            "vless://{}@{}?encryption=none&security=tls&type=httpupgrade",
+                            user.vless_uuid.unwrap_or_default(),
+                            node.address
+                        );
+                        configs.push(config);
+
+                        if let Some(hy2_pass) = &user.hy2_password {
+                            let hy2_config = format!("hy2://{}@{}", hy2_pass, node.address);
+                            configs.push(hy2_config);
+                        }
+
+                        if let Some(tuic_uuid) = user.tuic_uuid {
+                            let tuic_config = format!("tuic://{}@{}", tuic_uuid, node.address);
+                            configs.push(tuic_config);
                         }
                     }
-
-                    let mut configs = Vec::new();
-                    for node in nodes {
-                        if user.tier == "free" {
-                            let config = format!(
-                                "vless://{}@{}?encryption=none&security=tls&type=httpupgrade&mark=100",
-                                user.vless_uuid.unwrap_or_default(),
-                                node.address
-                            );
-                            configs.push(config);
-                        } else {
-                            let config = format!(
-                                "vless://{}@{}?encryption=none&security=tls&type=httpupgrade",
-                                user.vless_uuid.unwrap_or_default(),
-                                node.address
-                            );
-                            configs.push(config);
-
-                            if let Some(hy2_pass) = &user.hy2_password {
-                                let hy2_config = format!(
-                                    "hy2://{}@{}",
-                                    hy2_pass,
-                                    node.address
-                                );
-                                configs.push(hy2_config);
-                            }
-
-                            if let Some(tuic_uuid) = user.tuic_uuid {
-                                let tuic_config = format!(
-                                    "tuic://{}@{}",
-                                    tuic_uuid,
-                                    node.address
-                                );
-                                configs.push(tuic_config);
-                            }
-                        }
-                    }
-
-                    let combined = configs.join("\n");
-                    let encoded = base64::engine::general_purpose::STANDARD.encode(&combined);
-
-                    (
-                        StatusCode::OK,
-                        [("Content-Type", "text/plain; charset=utf-8")],
-                        encoded,
-                    )
-                        .into_response()
                 }
-                Ok(None) => StatusCode::NOT_FOUND.into_response(),
-                Err(e) => {
-                    log::error!("Ошибка запроса пользователя: {}", e);
-                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
-                }
+
+                let combined = configs.join("\n");
+                let encoded = base64::engine::general_purpose::STANDARD.encode(&combined);
+
+                (
+                    StatusCode::OK,
+                    [("Content-Type", "text/plain; charset=utf-8")],
+                    encoded,
+                )
+                    .into_response()
             }
-        }
+            Ok(None) => StatusCode::NOT_FOUND.into_response(),
+            Err(e) => {
+                log::error!("Ошибка запроса пользователя: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            }
+        },
         Err(e) => {
             log::error!("Ошибка запроса узлов: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR.into_response()

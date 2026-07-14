@@ -1,0 +1,68 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM users",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tg_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "tier",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "expire_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 3,
+        "name": "vless_uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "naive_username",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "naive_password",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "hy2_password",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "tuic_uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 8,
+        "name": "tuic_password",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "26e7e05427bc7dabcd7815d27764fda2baf4cfe60a2d2d6ee2a1f773dccbbce2"
+}

@@ -1,0 +1,55 @@
+{
+  "log": {
+    "level": "info"
+  },
+  "inbounds": [
+    {
+      "type": "vless",
+      "tag": "in-vless-reality",
+      "listen": "::",
+      "listen_port": 443,
+      "users": [
+        {
+          "name": "main",
+          "uuid": "4b02abd5-b2a0-40b8-b16a-84e4463827ca",
+          "flow": "xtls-rprx-vision"
+        }
+      ],
+      "tls": {
+        "enabled": true,
+        "server_name": "addons.mozilla.org",
+        "reality": {
+          "enabled": true,
+          "handshake": {
+            "server": "addons.mozilla.org",
+            "server_port": 443
+          },
+          "private_key": "MINV0Cf0H1iE2cyxqc-hwFVp1cKPsbEhz5Kg71GND1M",
+          "short_id": [
+            "73024cf28e3a77b6"
+          ]
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct"
+    },
+    {
+      "type": "block",
+      "tag": "block"
+    }
+  ],
+  "route": {
+    "rules": [
+      {
+        "ip_is_private": true,
+        "action": "route",
+        "outbound": "block"
+      }
+    ],
+    "final": "direct"
+  }
+}

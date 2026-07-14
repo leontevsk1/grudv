@@ -7,6 +7,7 @@ use uuid::Uuid;
 // ПОЛЬЗОВАТЕЛИ
 // -----------------------------------------------------------------
 
+#[allow(clippy::too_many_arguments)]
 pub async fn upsert_user(
     pool: &PgPool,
     tg_id: i64,

@@ -1,0 +1,31 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  rust-build:
+    runs-on: debian-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
+        working-directory: vpn-core
+      - run: cargo clippy -- -D warnings
+        working-directory: vpn-core
+
+  go-build:
+    runs-on: debian-latest
+    strategy:
+      matrix:
+        service: [bot, nup]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+      - run: go build ./...
+        working-directory: ${{ matrix.service }}
+      - run: go vet ./...
+        working-directory: ${{ matrix.service }}

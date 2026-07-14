@@ -6,7 +6,7 @@ on:
 
 jobs:
   rust-build:
-    runs-on: debian-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -16,7 +16,7 @@ jobs:
         working-directory: vpn-core
 
   go-build:
-    runs-on: debian-latest
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         service: [bot, nup]

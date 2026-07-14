@@ -8,8 +8,6 @@
       "tag": "in-vless-reality",
       "listen": "::",
       "listen_port": 443,
-      "sniff": true,
-      "sniff_override_destination": true,
       "users": [
         { "name": "premium", "uuid": "<PREMIUM_UUID_1>", "flow": "xtls-rprx-vision" },
         { "name": "free", "uuid": "<FREE_UUID_1>", "flow": "xtls-rprx-vision" }
@@ -39,10 +37,6 @@
         { "name": "premium", "password": "<PREMIUM_HY2_PASSWORD>" },
         { "name": "free", "password": "<FREE_HY2_PASSWORD>" }
       ],
-      "obfs": {
-        "type": "salamander",
-        "password": "<LOCAL_OBFS_SHARED_PASSWORD>"
-      },
       "tls": {
         "enabled": true,
         "alpn": ["h3"],
@@ -118,10 +112,6 @@
       "server": "<FOREIGN_SERVER_IP>",
       "server_port": 8443,
       "password": "<FOREIGN_HY2_PASSWORD>",
-      "obfs": {
-        "type": "salamander",
-        "password": "<FOREIGN_OBFS_PASSWORD>"
-      },
       "tls": {
         "enabled": true,
         "server_name": "<FOREIGN_DOMAIN_FOR_HY2>",
@@ -135,10 +125,6 @@
       "server_port": 8443,
       "password": "<FOREIGN_HY2_PASSWORD>",
       "routing_mark": 100,
-      "obfs": {
-        "type": "salamander",
-        "password": "<FOREIGN_OBFS_PASSWORD>"
-      },
       "tls": {
         "enabled": true,
         "server_name": "<FOREIGN_DOMAIN_FOR_HY2>",

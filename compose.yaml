@@ -11,7 +11,7 @@ services:
       - "127.0.0.1:5432:5432" # Пробрасываем порт наружу, чтобы локальный vpn-core дотянулся до БД
     environment:
       POSTGRES_USER: master_user
-      POSTGRES_PASSWORD: master_password_secure
+      POSTGRES_PASSWORD: 8d2db6862f66a3a3e81abd9e024f942b851f23a7d112fad9
       POSTGRES_DB: vpn_core
     volumes:
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE users SET tier = 'premium', expire_at = $1 WHERE tg_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamp",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bd6d6dfc7be9f37aa5faeb0f55ed5a60f479d7793ae568097f1e4da092932e7d"
+}

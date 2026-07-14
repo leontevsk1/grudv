@@ -31,3 +31,28 @@ jobs:
         working-directory: ${{ matrix.service }}
       - run: go vet ./...
         working-directory: ${{ matrix.service }}
+
+  rust-test:
+    needs: rust-build
+    runs-on: ubuntu-latest
+    env:
+      SQLX_OFFLINE: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test
+        working-directory: vpn-core
+
+  go-test:
+    needs: go-build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [bot, nup]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+      - run: go test ./...
+        working-directory: ${{ matrix.service }}

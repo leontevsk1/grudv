@@ -1,0 +1,74 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM nodes WHERE status = 'active'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "address",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "node_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "join_token",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "reality_pub_key",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "reality_short_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "obfs_password",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "upstream_node_id",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "5038314771c67075e5be7e3ff86db9350458a351a26ae7b2bbc8fb25deb80d21"
+}

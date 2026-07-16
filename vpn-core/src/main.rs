@@ -1,6 +1,8 @@
 mod db;
 mod handlers;
 mod models;
+#[cfg(test)]
+mod tests;
 
 use axum::{
     Router,

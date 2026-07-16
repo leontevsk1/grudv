@@ -21,11 +21,34 @@ pub struct AppState {
 }
 
 // Вспомогательная функция для извлечения Bearer-токена
-fn extract_bearer(headers: &HeaderMap) -> Option<String> {
+pub fn extract_bearer(headers: &HeaderMap) -> Option<String> {
     headers
         .get("authorization")
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.strip_prefix("Bearer ").map(String::from))
+}
+
+// Строит список ссылок для одного узла под конкретного пользователя.
+// Троттлинг free-пользователей идёт на сервере по UUID (см. nup/template.go),
+// а не по параметрам ссылки — клиент не может повлиять на свою полосу.
+pub fn build_sub_configs(user: &crate::models::User, node_address: &str) -> Vec<String> {
+    let mut configs = vec![format!(
+        "vless://{}@{}?encryption=none&security=tls&type=httpupgrade",
+        user.vless_uuid.unwrap_or_default(),
+        node_address
+    )];
+
+    if user.tier != "free" {
+        if let Some(hy2_pass) = &user.hy2_password {
+            configs.push(format!("hy2://{}@{}", hy2_pass, node_address));
+        }
+
+        if let Some(tuic_uuid) = user.tuic_uuid {
+            configs.push(format!("tuic://{}@{}", tuic_uuid, node_address));
+        }
+    }
+
+    configs
 }
 
 // -----------------------------------------------------------------
@@ -311,31 +334,7 @@ pub async fn get_sub(State(state): State<AppState>, Path(tg_id): Path<i64>) -> i
 
                 let mut configs = Vec::new();
                 for node in nodes {
-                    if user.tier == "free" {
-                        let config = format!(
-                            "vless://{}@{}?encryption=none&security=tls&type=httpupgrade&mark=100",
-                            user.vless_uuid.unwrap_or_default(),
-                            node.address
-                        );
-                        configs.push(config);
-                    } else {
-                        let config = format!(
-                            "vless://{}@{}?encryption=none&security=tls&type=httpupgrade",
-                            user.vless_uuid.unwrap_or_default(),
-                            node.address
-                        );
-                        configs.push(config);
-
-                        if let Some(hy2_pass) = &user.hy2_password {
-                            let hy2_config = format!("hy2://{}@{}", hy2_pass, node.address);
-                            configs.push(hy2_config);
-                        }
-
-                        if let Some(tuic_uuid) = user.tuic_uuid {
-                            let tuic_config = format!("tuic://{}@{}", tuic_uuid, node.address);
-                            configs.push(tuic_config);
-                        }
-                    }
+                    configs.extend(build_sub_configs(&user, &node.address));
                 }
 
                 let combined = configs.join("\n");

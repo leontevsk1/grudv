@@ -7,3 +7,5 @@ spec.md
 vendor
 pg_data
 docs/
+.claude*
+personal

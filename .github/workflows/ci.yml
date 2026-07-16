@@ -31,7 +31,7 @@ jobs:
         working-directory: ${{ matrix.service }}
       - run: go vet ./...
         working-directory: ${{ matrix.service }}
-
+        
   rust-test:
     needs: rust-build
     runs-on: ubuntu-latest
@@ -56,3 +56,28 @@ jobs:
           go-version: "1.26"
       - run: go test ./...
         working-directory: ${{ matrix.service }}
+        
+  build-and-push:
+    needs: [rust-build, go-build]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./vpn-core
+          push: true
+          tags: ghcr.io/${{ github.repository }}/vpn-core:${{ github.sha }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./bot
+          push: true
+          tags: ghcr.io/${{ github.repository }}/bot:${{ github.sha }}

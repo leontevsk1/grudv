@@ -28,6 +28,12 @@ type UserResponse struct {
 	Hy2Password   *string `json:"hy2_password"`
 	TuicUUID      *string `json:"tuic_uuid"`
 	TuicPassword  *string `json:"tuic_password"`
+	SubToken      string  `json:"sub_token"`
+}
+
+type Notification struct {
+	TgID    int64  `json:"tg_id"`
+	Message string `json:"message"`
 }
 
 func NewCoreClient(url, secret string) *CoreClient {
@@ -91,6 +97,30 @@ func (c *CoreClient) GetUser(tgID int64) (*UserResponse, error) {
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (c *CoreClient) FetchNotifications() ([]Notification, error) {
+	req, err := http.NewRequest("GET", c.MasterURL+"/api/v1/notifications", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.BotSecret)
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("master returned status: %d", resp.StatusCode)
+	}
+
+	var notifications []Notification
+	if err := json.NewDecoder(resp.Body).Decode(&notifications); err != nil {
+		return nil, err
+	}
+	return notifications, nil
 }
 
 func (c *CoreClient) ApprovePayment(paymentID int) error {

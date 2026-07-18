@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM users WHERE tg_id = $1",
+  "query": "SELECT * FROM users WHERE sub_token = $1",
   "describe": {
     "columns": [
       {
@@ -56,7 +56,7 @@
     ],
     "parameters": {
       "Left": [
-        "Int8"
+        "Text"
       ]
     },
     "nullable": [
@@ -72,5 +72,5 @@
       false
     ]
   },
-  "hash": "202500afa7ffd7701cc3a58449f00ba5b359695f45a3a78714b8c0466a3d48ee"
+  "hash": "2df6978765e8c3633d9bcdf1ae4248f4ee15be8d768757c72ff9b61d58e7945b"
 }

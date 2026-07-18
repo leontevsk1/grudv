@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 )
 
 type MasterUser struct {
@@ -54,6 +55,66 @@ type SingBoxNaiveUser struct {
 	Password string `json:"password"`
 }
 
+// Имя юзера в sing-box = tg_id: только так v2ray_api отдаёт статистику
+// трафика по каждому пользователю отдельно.
+func userName(u *MasterUser) string {
+	return strconv.FormatInt(u.TgID, 10)
+}
+
+func tierNames(users []MasterUser) (premiumNames, freeNames, allNames []string) {
+	for i := range users {
+		name := userName(&users[i])
+		if users[i].Tier == "free" {
+			freeNames = append(freeNames, name)
+		} else {
+			premiumNames = append(premiumNames, name)
+		}
+		allNames = append(allNames, name)
+	}
+	return premiumNames, freeNames, allNames
+}
+
+// Правила теперь матчатся по спискам имён, а не по имени тарифа,
+// поэтому собираются динамически; пустой матчер sing-box не принимает.
+func buildTierRules(premiumNames, freeNames []string, premiumOutbound, freeOutbound string, inboundTags []string) []any {
+	var rules []any
+	if len(premiumNames) > 0 {
+		rule := map[string]any{"user": premiumNames, "action": "route", "outbound": premiumOutbound}
+		if inboundTags != nil {
+			rule["inbound"] = inboundTags
+		}
+		rules = append(rules, rule)
+	}
+	if len(freeNames) > 0 {
+		rule := map[string]any{"user": freeNames, "action": "route", "outbound": freeOutbound}
+		if inboundTags != nil {
+			rule["inbound"] = inboundTags
+		}
+		rules = append(rules, rule)
+	}
+	return rules
+}
+
+func applyRouteRules(configMap map[string]any, tierRules []any) {
+	privateBlockRule := map[string]any{"ip_is_private": true, "action": "route", "outbound": "Block"}
+	rules := append([]any{privateBlockRule}, tierRules...)
+	configMap["route"].(map[string]any)["rules"] = rules
+}
+
+// Слушаем 0.0.0.0 внутри контейнера: подман-проброс порта не дотягивается
+// до 127.0.0.1 контейнера. Наружу порт публикуется только на 127.0.0.1 хоста.
+func applyV2rayAPI(configMap map[string]any, allNames []string) {
+	configMap["experimental"] = map[string]any{
+		"v2ray_api": map[string]any{
+			"listen": "0.0.0.0:8080",
+			"stats": map[string]any{
+				"enabled": true,
+				"users":   allNames,
+			},
+		},
+	}
+}
+
 func GenerateConfig(data *MasterConfigResponse) ([]byte, error) {
 	switch data.Node.NodeType {
 	case "reality":
@@ -75,16 +136,17 @@ func buildRealityConfig(data *MasterConfigResponse) ([]byte, error) {
 	var hy2Users []SingBoxHy2User
 	var tuicUsers []SingBoxTuicUser // Исправлен тип
 
-	for _, u := range data.Users {
+	for i := range data.Users {
+		u := &data.Users[i]
+		name := userName(u)
 		if u.VlessUUID != nil {
-			vlessUsers = append(vlessUsers, SingBoxUser{Name: u.Tier, UUID: *u.VlessUUID, Flow: "xtls-rprx-vision"})
+			vlessUsers = append(vlessUsers, SingBoxUser{Name: name, UUID: *u.VlessUUID, Flow: "xtls-rprx-vision"})
 		}
 		if u.Hy2Password != nil {
-			hy2Users = append(hy2Users, SingBoxHy2User{Name: u.Tier, Password: *u.Hy2Password})
+			hy2Users = append(hy2Users, SingBoxHy2User{Name: name, Password: *u.Hy2Password})
 		}
 		if u.TuicUUID != nil && u.TuicPassword != nil {
-			// Используем правильную структуру SingBoxTuicUser
-			tuicUsers = append(tuicUsers, SingBoxTuicUser{Name: u.Tier, UUID: *u.TuicUUID, Password: *u.TuicPassword})
+			tuicUsers = append(tuicUsers, SingBoxTuicUser{Name: name, UUID: *u.TuicUUID, Password: *u.TuicPassword})
 		}
 	}
 
@@ -140,11 +202,7 @@ func buildRealityConfig(data *MasterConfigResponse) ([]byte, error) {
 			{ "type": "block", "tag": "Block" }
 		],
 		"route": {
-			"rules": [
-				{ "ip_is_private": true, "action": "route", "outbound": "Block" },
-				{ "user": ["premium"], "action": "route", "outbound": "Direct-Premium" },
-				{ "user": ["free"], "action": "route", "outbound": "Direct-Free" }
-			],
+			"rules": [],
 			"final": "Block"
 		}
 	}`
@@ -166,6 +224,10 @@ func buildRealityConfig(data *MasterConfigResponse) ([]byte, error) {
 	tuicInbound := inbounds[2].(map[string]any)
 	tuicInbound["users"] = tuicUsers
 
+	premiumNames, freeNames, allNames := tierNames(data.Users)
+	applyRouteRules(configMap, buildTierRules(premiumNames, freeNames, "Direct-Premium", "Direct-Free", nil))
+	applyV2rayAPI(configMap, allNames)
+
 	return json.MarshalIndent(configMap, "", "  ")
 }
 
@@ -178,19 +240,20 @@ func buildWebConfig(data *MasterConfigResponse) ([]byte, error) {
 	var hy2Users []SingBoxHy2User
 	var tuicUsers []SingBoxTuicUser // Исправлен тип
 
-	for _, u := range data.Users {
+	for i := range data.Users {
+		u := &data.Users[i]
+		name := userName(u)
 		if u.VlessUUID != nil {
-			vlessUsers = append(vlessUsers, SingBoxUser{Name: u.Tier, UUID: *u.VlessUUID})
+			vlessUsers = append(vlessUsers, SingBoxUser{Name: name, UUID: *u.VlessUUID})
 		}
 		if u.NaiveUsername != nil && u.NaivePassword != nil {
-			naiveUsers = append(naiveUsers, SingBoxNaiveUser{Name: u.Tier, Username: *u.NaiveUsername, Password: *u.NaivePassword})
+			naiveUsers = append(naiveUsers, SingBoxNaiveUser{Name: name, Username: *u.NaiveUsername, Password: *u.NaivePassword})
 		}
 		if u.Hy2Password != nil {
-			hy2Users = append(hy2Users, SingBoxHy2User{Name: u.Tier, Password: *u.Hy2Password})
+			hy2Users = append(hy2Users, SingBoxHy2User{Name: name, Password: *u.Hy2Password})
 		}
 		if u.TuicUUID != nil && u.TuicPassword != nil {
-			// Используем правильную структуру SingBoxTuicUser
-			tuicUsers = append(tuicUsers, SingBoxTuicUser{Name: u.Tier, UUID: *u.TuicUUID, Password: *u.TuicPassword})
+			tuicUsers = append(tuicUsers, SingBoxTuicUser{Name: name, UUID: *u.TuicUUID, Password: *u.TuicPassword})
 		}
 	}
 
@@ -242,11 +305,7 @@ func buildWebConfig(data *MasterConfigResponse) ([]byte, error) {
 			{ "type": "block", "tag": "Block" }
 		],
 		"route": {
-			"rules": [
-				{ "ip_is_private": true, "action": "route", "outbound": "Block" },
-				{ "user": ["premium"], "action": "route", "outbound": "Direct-Premium" },
-				{ "user": ["free"], "action": "route", "outbound": "Direct-Free" }
-			],
+			"rules": [],
 			"final": "Block"
 		}
 	}`
@@ -263,6 +322,10 @@ func buildWebConfig(data *MasterConfigResponse) ([]byte, error) {
 	inbounds[2].(map[string]any)["users"] = hy2Users
 	inbounds[3].(map[string]any)["users"] = tuicUsers
 
+	premiumNames, freeNames, allNames := tierNames(data.Users)
+	applyRouteRules(configMap, buildTierRules(premiumNames, freeNames, "Direct-Premium", "Direct-Free", nil))
+	applyV2rayAPI(configMap, allNames)
+
 	return json.MarshalIndent(configMap, "", "  ")
 }
 
@@ -274,16 +337,17 @@ func buildRelayConfig(data *MasterConfigResponse) ([]byte, error) {
 	var hy2InboundUsers []SingBoxHy2User
 	var tuicInboundUsers []SingBoxTuicUser // Исправлен тип
 
-	for _, u := range data.Users {
+	for i := range data.Users {
+		u := &data.Users[i]
+		name := userName(u)
 		if u.VlessUUID != nil {
-			vlessInboundUsers = append(vlessInboundUsers, SingBoxUser{Name: u.Tier, UUID: *u.VlessUUID, Flow: "xtls-rprx-vision"})
+			vlessInboundUsers = append(vlessInboundUsers, SingBoxUser{Name: name, UUID: *u.VlessUUID, Flow: "xtls-rprx-vision"})
 		}
 		if u.Hy2Password != nil {
-			hy2InboundUsers = append(hy2InboundUsers, SingBoxHy2User{Name: u.Tier, Password: *u.Hy2Password})
+			hy2InboundUsers = append(hy2InboundUsers, SingBoxHy2User{Name: name, Password: *u.Hy2Password})
 		}
 		if u.TuicUUID != nil && u.TuicPassword != nil {
-			// Используем правильную структуру SingBoxTuicUser
-			tuicInboundUsers = append(tuicInboundUsers, SingBoxTuicUser{Name: u.Tier, UUID: *u.TuicUUID, Password: *u.TuicPassword})
+			tuicInboundUsers = append(tuicInboundUsers, SingBoxTuicUser{Name: name, UUID: *u.TuicUUID, Password: *u.TuicPassword})
 		}
 	}
 
@@ -374,13 +438,7 @@ func buildRelayConfig(data *MasterConfigResponse) ([]byte, error) {
 			{ "type": "block", "tag": "Block" }
 		],
 		"route": {
-			"rules": [
-				{ "ip_is_private": true, "action": "route", "outbound": "Block" },
-				{ "inbound": ["in-vless-reality"], "user": ["premium"], "action": "route", "outbound": "Upstream-TCP-Premium" },
-				{ "inbound": ["in-vless-reality"], "user": ["free"], "action": "route", "outbound": "Upstream-TCP-Free" },
-				{ "inbound": ["in-hysteria2", "in-tuic"], "user": ["premium"], "action": "route", "outbound": "Upstream-UDP-Premium" },
-				{ "inbound": ["in-hysteria2", "in-tuic"], "user": ["free"], "action": "route", "outbound": "Upstream-UDP-Free" }
-			],
+			"rules": [],
 			"final": "Block"
 		}
 	}`
@@ -416,6 +474,12 @@ func buildRelayConfig(data *MasterConfigResponse) ([]byte, error) {
 	// Hysteria Upstream
 	outbounds[2].(map[string]any)["password"] = "<FOREIGN_HY2_PASSWORD>"
 	outbounds[3].(map[string]any)["password"] = "<FOREIGN_HY2_PASSWORD>"
+
+	premiumNames, freeNames, allNames := tierNames(data.Users)
+	tcpRules := buildTierRules(premiumNames, freeNames, "Upstream-TCP-Premium", "Upstream-TCP-Free", []string{"in-vless-reality"})
+	udpRules := buildTierRules(premiumNames, freeNames, "Upstream-UDP-Premium", "Upstream-UDP-Free", []string{"in-hysteria2", "in-tuic"})
+	applyRouteRules(configMap, append(tcpRules, udpRules...))
+	applyV2rayAPI(configMap, allNames)
 
 	return json.MarshalIndent(configMap, "", "  ")
 }

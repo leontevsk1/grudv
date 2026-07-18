@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM sub_access WHERE tg_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fadca38f02f7935db19cbd6d093e36c3265ee9666af5f4e02c4bf6b9179aac9b"
+}

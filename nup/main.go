@@ -27,6 +27,9 @@ func main() {
 	fetchAndApplyConfig(cfg)
 
 	for range ticker.C {
+		// Сначала снимаем статистику: рестарт контейнера при обновлении
+		// конфига обнуляет счётчики sing-box.
+		CollectAndReportTraffic(cfg)
 		fetchAndApplyConfig(cfg)
 	}
 }

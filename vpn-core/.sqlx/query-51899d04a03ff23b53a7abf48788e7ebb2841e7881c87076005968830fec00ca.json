@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO sub_access (tg_id, ip, seen_at)\n        VALUES ($1, $2, now())\n        ON CONFLICT (tg_id, ip) DO UPDATE SET seen_at = now()\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "51899d04a03ff23b53a7abf48788e7ebb2841e7881c87076005968830fec00ca"
+}

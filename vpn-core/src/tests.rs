@@ -1,4 +1,4 @@
-use crate::handlers::{build_sub_configs, extract_bearer};
+use crate::handlers::{build_sub_configs, effective_tier, extract_bearer};
 use crate::models::User;
 use axum::http::{HeaderMap, HeaderValue};
 use uuid::Uuid;
@@ -14,6 +14,7 @@ fn make_user(tier: &str) -> User {
         hy2_password: Some("hy2pass".to_string()),
         tuic_uuid: Some(Uuid::nil()),
         tuic_password: Some("tuicpass".to_string()),
+        sub_token: "token123".to_string(),
     }
 }
 
@@ -69,4 +70,31 @@ fn extract_bearer_rejects_wrong_scheme() {
     headers.insert("authorization", HeaderValue::from_static("Basic secret123"));
 
     assert_eq!(extract_bearer(&headers), None);
+}
+
+#[test]
+fn premium_over_limit_becomes_free() {
+    assert_eq!(effective_tier("premium", true), "free");
+}
+
+#[test]
+fn premium_under_limit_stays_premium() {
+    assert_eq!(effective_tier("premium", false), "premium");
+}
+
+#[test]
+fn free_and_admin_tiers_unchanged_by_limit() {
+    assert_eq!(effective_tier("free", true), "free");
+    assert_eq!(effective_tier("admin", true), "admin");
+}
+
+#[test]
+fn over_limit_premium_gets_only_vless() {
+    let mut user = make_user("premium");
+    user.tier = effective_tier(&user.tier, true).to_string();
+
+    let configs = build_sub_configs(&user, "node.example.com");
+
+    assert_eq!(configs.len(), 1);
+    assert!(configs[0].starts_with("vless://"));
 }

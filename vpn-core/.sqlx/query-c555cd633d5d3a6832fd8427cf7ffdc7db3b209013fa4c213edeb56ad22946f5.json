@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO user_traffic (tg_id, month, bytes)\n        VALUES ($1, date_trunc('month', now())::date, $2)\n        ON CONFLICT (tg_id, month) DO UPDATE SET bytes = user_traffic.bytes + EXCLUDED.bytes\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c555cd633d5d3a6832fd8427cf7ffdc7db3b209013fa4c213edeb56ad22946f5"
+}

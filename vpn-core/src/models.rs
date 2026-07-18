@@ -18,6 +18,7 @@ pub struct User {
     pub hy2_password: Option<String>,
     pub tuic_uuid: Option<Uuid>,
     pub tuic_password: Option<String>,
+    pub sub_token: String,
 }
 
 #[derive(Debug, Serialize, FromRow)]
@@ -47,6 +48,12 @@ pub struct UserUpsertRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct TrafficReport {
+    pub tg_id: i64,
+    pub bytes: i64,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct NodeCreateRequest {
     pub name: String,
     pub address: String,
@@ -63,4 +70,10 @@ pub struct NupConfigResponse {
     pub node: Node,
     pub users: Vec<User>,
     pub upstream_node: Option<Node>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Notification {
+    pub tg_id: i64,
+    pub message: String,
 }

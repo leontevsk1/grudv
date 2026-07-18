@@ -55,10 +55,13 @@ async fn main() {
         // Управление узлами (для бота/админа)
         .route("/api/v1/nodes", post(handlers::create_node))
         .route("/api/v1/nodes/{id}", delete(handlers::delete_node))
-        // Pull-конфигурация (для nup)
+        // Pull-конфигурация и отчёты о трафике (для nup)
         .route("/api/v1/nup/config", get(handlers::get_nup_config))
+        .route("/api/v1/nup/traffic", post(handlers::report_traffic))
+        // Очередь уведомлений (для бота)
+        .route("/api/v1/notifications", get(handlers::get_notifications))
         // Подписка для клиентов
-        .route("/api/sub/{tg_id}", get(handlers::get_sub))
+        .route("/api/sub/{token}", get(handlers::get_sub))
         .with_state(state);
 
     let port = 8443;
@@ -67,5 +70,10 @@ async fn main() {
         .unwrap();
 
     log::info!("vpn-core слушает порт {}", port);
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .await
+    .unwrap();
 }

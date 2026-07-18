@@ -1,6 +1,8 @@
+use std::net::SocketAddr;
+
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{ConnectInfo, Path, State},
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
 };
@@ -11,8 +13,16 @@ use uuid::Uuid;
 
 use crate::{
     db,
-    models::{NodeCreateRequest, NupConfigResponse, UserUpsertRequest},
+    models::{NodeCreateRequest, NupConfigResponse, TrafficReport, UserUpsertRequest},
 };
+
+pub const SUB_IP_LIMIT: i64 = 20;
+pub const PREMIUM_MONTHLY_LIMIT_BYTES: i64 = 200_000_000_000;
+
+const SHARING_BLOCKED_MESSAGE: &str =
+    "Ваша подписка была заблокирована из-за подозрения в совместном использовании. Обратитесь в поддержку.";
+const LIMIT_REACHED_MESSAGE: &str =
+    "Вы израсходовали месячный лимит 200 ГБ. Скорость снижена до 512 кбит/с до конца месяца.";
 
 #[derive(Clone)]
 pub struct AppState {
@@ -49,6 +59,15 @@ pub fn build_sub_configs(user: &crate::models::User, node_address: &str) -> Vec<
     }
 
     configs
+}
+
+// Premium-юзер, выбравший месячный лимит, до конца месяца обслуживается как free.
+pub fn effective_tier(tier: &str, over_limit: bool) -> &str {
+    if tier == "premium" && over_limit {
+        "free"
+    } else {
+        tier
+    }
 }
 
 // -----------------------------------------------------------------
@@ -91,6 +110,7 @@ pub async fn upsert_user(
         Some(hy2_password),
         Some(tuic_uuid),
         Some(Uuid::new_v4().simple().to_string()[..16].to_string()),
+        &Uuid::new_v4().simple().to_string(),
     )
     .await;
 
@@ -309,6 +329,19 @@ pub async fn get_nup_config(
         None
     };
 
+    let over_limit_ids = match db::get_over_limit_tg_ids(&state.db, PREMIUM_MONTHLY_LIMIT_BYTES).await {
+        Ok(ids) => ids,
+        Err(e) => {
+            log::error!("Ошибка запроса лимитов трафика: {}", e);
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    let mut users = users;
+    for user in users.iter_mut() {
+        user.tier = effective_tier(&user.tier, over_limit_ids.contains(&user.tg_id)).to_string();
+    }
+
     let response = NupConfigResponse {
         node,
         users,
@@ -318,44 +351,175 @@ pub async fn get_nup_config(
     (StatusCode::OK, Json(response)).into_response()
 }
 
+pub async fn report_traffic(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(reports): Json<Vec<TrafficReport>>,
+) -> impl IntoResponse {
+    let join_token = extract_bearer(&headers).unwrap_or_default();
+    match db::get_node_by_token(&state.db, &join_token).await {
+        Ok(Some(_)) => {}
+        Ok(None) => return StatusCode::UNAUTHORIZED.into_response(),
+        Err(e) => {
+            log::error!("Ошибка поиска узла по токену: {}", e);
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    }
+
+    for report in reports {
+        if report.bytes <= 0 {
+            continue;
+        }
+
+        if let Err(e) = db::add_traffic(&state.db, report.tg_id, report.bytes).await {
+            log::error!("Ошибка учёта трафика юзера {}: {}", report.tg_id, e);
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+
+        let is_premium = match db::get_user(&state.db, report.tg_id).await {
+            Ok(Some(user)) => user.tier == "premium",
+            Ok(None) => false,
+            Err(e) => {
+                log::error!("Ошибка запроса пользователя: {}", e);
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        };
+        if !is_premium {
+            continue;
+        }
+
+        match db::mark_limit_crossed(&state.db, report.tg_id, PREMIUM_MONTHLY_LIMIT_BYTES).await {
+            Ok(true) => {
+                if let Err(e) =
+                    db::insert_notification(&state.db, report.tg_id, LIMIT_REACHED_MESSAGE).await
+                {
+                    log::error!("Ошибка постановки уведомления о лимите: {}", e);
+                }
+            }
+            Ok(false) => {}
+            Err(e) => {
+                log::error!("Ошибка проверки лимита трафика: {}", e);
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        }
+    }
+
+    StatusCode::OK.into_response()
+}
+
+// -----------------------------------------------------------------
+// УВЕДОМЛЕНИЯ (API для Бота)
+// -----------------------------------------------------------------
+
+pub async fn get_notifications(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let token = extract_bearer(&headers).unwrap_or_default();
+    if token != state.bot_secret {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+
+    match db::drain_notifications(&state.db).await {
+        Ok(notifications) => (StatusCode::OK, Json(notifications)).into_response(),
+        Err(e) => {
+            log::error!("Ошибка выборки уведомлений: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
 // -----------------------------------------------------------------
 // ПОДПИСКА (Для клиентов sing-box/xray)
 // -----------------------------------------------------------------
 
-pub async fn get_sub(State(state): State<AppState>, Path(tg_id): Path<i64>) -> impl IntoResponse {
-    match db::get_all_nodes(&state.db).await {
-        Ok(nodes) => match db::get_user(&state.db, tg_id).await {
-            Ok(Some(user)) => {
-                if let Some(expire_at) = user.expire_at
-                    && expire_at < chrono::Local::now().naive_local()
-                {
-                    return StatusCode::FORBIDDEN.into_response();
-                }
+pub async fn get_sub(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Path(token): Path<String>,
+) -> impl IntoResponse {
+    let mut user = match db::get_user_by_sub_token(&state.db, &token).await {
+        Ok(Some(u)) => u,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(e) => {
+            log::error!("Ошибка запроса пользователя по sub_token: {}", e);
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
 
-                let mut configs = Vec::new();
-                for node in nodes {
-                    configs.extend(build_sub_configs(&user, &node.address));
-                }
+    if let Some(expire_at) = user.expire_at
+        && expire_at < chrono::Local::now().naive_local()
+    {
+        return StatusCode::FORBIDDEN.into_response();
+    }
 
-                let combined = configs.join("\n");
-                let encoded = base64::engine::general_purpose::STANDARD.encode(&combined);
+    let ip_count = match db::record_sub_access(&state.db, user.tg_id, &addr.ip().to_string()).await
+    {
+        Ok(count) => count,
+        Err(e) => {
+            log::error!("Ошибка учёта IP подписки: {}", e);
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
 
-                (
-                    StatusCode::OK,
-                    [("Content-Type", "text/plain; charset=utf-8")],
-                    encoded,
-                )
-                    .into_response()
-            }
-            Ok(None) => StatusCode::NOT_FOUND.into_response(),
-            Err(e) => {
-                log::error!("Ошибка запроса пользователя: {}", e);
-                StatusCode::INTERNAL_SERVER_ERROR.into_response()
-            }
-        },
+    if ip_count >= SUB_IP_LIMIT {
+        if let Err(e) = rotate_and_notify(&state.db, user.tg_id).await {
+            log::error!("Ошибка ротации кредов юзера {}: {}", user.tg_id, e);
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+        return StatusCode::FORBIDDEN.into_response();
+    }
+
+    let over_limit = match db::get_over_limit_tg_ids(&state.db, PREMIUM_MONTHLY_LIMIT_BYTES).await {
+        Ok(ids) => ids.contains(&user.tg_id),
+        Err(e) => {
+            log::error!("Ошибка запроса лимитов трафика: {}", e);
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    user.tier = effective_tier(&user.tier, over_limit).to_string();
+
+    let nodes = match db::get_all_nodes(&state.db).await {
+        Ok(n) => n,
         Err(e) => {
             log::error!("Ошибка запроса узлов: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
+    };
+
+    let mut configs = Vec::new();
+    for node in nodes {
+        configs.extend(build_sub_configs(&user, &node.address));
     }
+
+    let combined = configs.join("\n");
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&combined);
+
+    (
+        StatusCode::OK,
+        [("Content-Type", "text/plain; charset=utf-8")],
+        encoded,
+    )
+        .into_response()
+}
+
+// Перевыпускает все креды и sub_token: старые конфиги на устройствах
+// умирают, как только nup перечитает конфиг (до минуты).
+async fn rotate_and_notify(pool: &PgPool, tg_id: i64) -> Result<(), sqlx::Error> {
+    db::rotate_user_credentials(
+        pool,
+        tg_id,
+        Uuid::new_v4(),
+        &Uuid::new_v4().simple().to_string()[..10],
+        &Uuid::new_v4().simple().to_string()[..16],
+        &Uuid::new_v4().simple().to_string()[..16],
+        Uuid::new_v4(),
+        &Uuid::new_v4().simple().to_string()[..16],
+        &Uuid::new_v4().simple().to_string(),
+    )
+    .await?;
+    db::clear_sub_access(pool, tg_id).await?;
+    db::insert_notification(pool, tg_id, SHARING_BLOCKED_MESSAGE).await?;
+
+    Ok(())
 }

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE user_traffic\n        SET limit_notified = TRUE\n        WHERE tg_id = $1 AND month = date_trunc('month', now())::date\n          AND bytes >= $2 AND limit_notified = FALSE\n        RETURNING tg_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tg_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "65742ebd4471a49d31932d27c60062ed9575d7415f24d08bca79f2152d2d4131"
+}

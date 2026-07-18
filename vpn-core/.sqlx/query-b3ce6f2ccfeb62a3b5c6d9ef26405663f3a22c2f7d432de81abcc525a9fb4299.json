@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE users\n        SET vless_uuid = $2, naive_username = $3, naive_password = $4,\n            hy2_password = $5, tuic_uuid = $6, tuic_password = $7, sub_token = $8\n        WHERE tg_id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Uuid",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b3ce6f2ccfeb62a3b5c6d9ef26405663f3a22c2f7d432de81abcc525a9fb4299"
+}

@@ -20,12 +20,14 @@ services:
 
   # 2. Симулируемый Воркер (Контейнер sing-box)
   sing-box-worker:
-    image: ghcr.io/sagernet/sing-box:latest
+    # Кастомная сборка с with_v2ray_api (см. singbox/Dockerfile) — официальный образ без него
+    image: ghcr.io/leontevsk1/grudv/sing-box:latest
     container_name: sing-box-backup
     privileged: true
     ports:
       - "127.0.0.1:2026:2026"
       - "127.0.0.1:8444:8443"
+      - "127.0.0.1:8080:8080" # v2ray_api для сбора статистики трафика nup'ом
     volumes:
       - ./sim_etc_singbox:/etc/sing-box
     command: run -c /etc/sing-box/config.json

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO users (tg_id, tier, expire_at, vless_uuid, naive_username, naive_password, hy2_password, tuic_uuid, tuic_password, sub_token)\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\n        ON CONFLICT (tg_id) DO UPDATE\n        SET tier = EXCLUDED.tier, expire_at = EXCLUDED.expire_at\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Varchar",
+        "Timestamp",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Uuid",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1d4d9f310f504fcfe9841de427820d1483e5d732f0bc84020674dcd17eaaf9b1"
+}

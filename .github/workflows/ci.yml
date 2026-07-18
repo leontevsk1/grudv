@@ -81,3 +81,10 @@ jobs:
           context: ./bot
           push: true
           tags: ghcr.io/${{ github.repository }}/bot:${{ github.sha }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./singbox
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/sing-box:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/sing-box:latest

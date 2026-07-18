@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT tg_id FROM user_traffic\n        WHERE month = date_trunc('month', now())::date AND bytes >= $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tg_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d7d459d561edac821cd7e8e0c9b387743c96ed573ab00280deb8d94a906e91e1"
+}

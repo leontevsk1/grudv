@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -36,6 +37,8 @@ func main() {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 	updates := bot.GetUpdatesChan(u)
+
+	go deliverNotifications(bot, core)
 
 	// Счетчик для имитации ID заявок в рамках MVP (в боевой системе пишется в payment_requests)
 	paymentCounter := 1000
@@ -83,7 +86,7 @@ func main() {
 				sb.WriteString("⚠️ Трафик искусственно замедлен ядрами Linux (tc троттлинг). Оплатите Premium для высокой скорости.\n")
 			}
 
-			sb.WriteString(fmt.Sprintf("\nСсылка на подписку:\n`%s/api/sub/%d`\n", core.MasterURL, chatID))
+			sb.WriteString(fmt.Sprintf("\nСсылка на подписку:\n`%s/api/sub/%s`\n", core.MasterURL, user.SubToken))
 			sb.WriteString("\nЭта ссылка работает со всеми современными VPN-клиентами (sing-box, xray и т.д.)")
 
 			msgOut := tgbotapi.NewMessage(chatID, sb.String())
@@ -109,6 +112,27 @@ func main() {
 
 		default:
 			bot.Send(tgbotapi.NewMessage(chatID, "Неизвестная команда. Доступны: /start, /info, или напишите 'Я оплатил' для отправки чека."))
+		}
+	}
+}
+
+// Раз в минуту забирает из vpn-core очередь уведомлений (блокировка за шаринг,
+// исчерпание лимита трафика) и рассылает их пользователям.
+func deliverNotifications(bot *tgbotapi.BotAPI, core *CoreClient) {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		notifications, err := core.FetchNotifications()
+		if err != nil {
+			log.Printf("Ошибка запроса уведомлений: %v", err)
+			continue
+		}
+
+		for _, n := range notifications {
+			if _, err := bot.Send(tgbotapi.NewMessage(n.TgID, n.Message)); err != nil {
+				log.Printf("Ошибка отправки уведомления юзеру %d: %v", n.TgID, err)
+			}
 		}
 	}
 }

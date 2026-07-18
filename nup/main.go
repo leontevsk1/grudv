@@ -90,11 +90,11 @@ func fetchAndApplyConfig(cfg *Config) {
 	log.Println("Конфигурация sing-box обновлена. Перезапуск контейнера...")
 
 	// Топорный императивный перезапуск контейнера через bash по ТЗ
-	cmd := exec.Command("podman", "restart", "sing-box-backup")
+	cmd := exec.Command(cfg.ContainerEngine, "restart", cfg.ContainerName)
 	if err := cmd.Run(); err != nil {
-		log.Printf("Ошибка перезапуска контейнера sing-box: %v", err)
+		log.Printf("Ошибка перезапуска контейнера sing-box (%s): %v", cfg.ContainerEngine, err)
 	} else {
-		log.Println("Контейнер sing-box-backup успешно перезапущен.")
+		log.Printf("Контейнер %s успешно перезапущен (%s).", cfg.ContainerName, cfg.ContainerEngine)
 	}
 
 	ApplyTrafficShaping(masterData.Users)

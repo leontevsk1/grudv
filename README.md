@@ -72,6 +72,18 @@ Freemium. У бесплатных пользователей трафик в sin
 
 Нужен `.env` в корне (переменные: `DATABASE_URL`, `TELEGRAM_BOT_TOKEN`, `ADMIN_TG_ID`, `MASTER_URL`, `BOT_SECRET`, `NODE_JOIN_TOKEN`, `NODE_ID`).
 
+## Секреты
+
+`.env`-файлы — только для локального запуска, в git не попадают (`.gitignore`). Источник правды для секретов — `secrets.enc.yaml` в корне, зашифрованный через [sops](https://github.com/getsops/sops) + [age](https://github.com/FiloSottile/age); коммитится в открытом виде, расшифровать может только тот, у кого есть приватный age-ключ (`~/.config/sops/age/keys.txt`, не в репозитории).
+
+```bash
+sops secrets.enc.yaml              # открыть на редактирование ($EDITOR), сохранение — авто-перешифровка
+sops --decrypt secrets.enc.yaml    # посмотреть всё в открытом виде
+sops --decrypt --extract '["bot_secret"]' secrets.enc.yaml   # одно поле
+```
+
+Деплой-скрипты (`personal/deploy-worker.sh`, `personal/deploy-master.sh`) читают секреты отсюда сами — переменные вроде `BOT_SECRET` больше не набираются руками в SSH-команде (это и было источником прошлой опечатки). `.sops.yaml` в корне задаёт, каким age-ключом шифровать; при добавлении второго человека к проекту — добавить его публичный age-ключ туда и запустить `sops updatekeys secrets.enc.yaml`.
+
 ## Состояние проекта
 
 MVP, крутится локально в podman-контейнерах для симуляции распределённой топологии. Тестов нет. Автоматизированного деплоя на реальные VPS нет — план по этому есть в `ops.md`.

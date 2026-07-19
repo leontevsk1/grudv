@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE nodes SET reality_pub_key = $1, reality_short_id = $2 WHERE join_token = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ba398f463f28a2c81fe570db4b4b29e1b63e034451bcf75e601cd560c339b861"
+}

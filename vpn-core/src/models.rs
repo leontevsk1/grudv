@@ -54,6 +54,12 @@ pub struct NodeCreateRequest {
     pub upstream_node_id: Option<i32>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct NodeKeysRequest {
+    pub public_key: String,
+    pub short_id: String,
+}
+
 // -----------------------------------------------------------------
 // МОДЕЛИ ИСХОДЯЩИХ ОТВЕТОВ (API RESPONSES)
 // -----------------------------------------------------------------

@@ -44,13 +44,21 @@ func decodeInbounds(t *testing.T, raw []byte) []map[string]any {
 	return inbounds
 }
 
+func testLocalKeys() *RealityLocalKeys {
+	return &RealityLocalKeys{
+		PrivateKey: "local-private-key",
+		PublicKey:  "local-public-key",
+		ShortID:    "deadbeef",
+	}
+}
+
 func TestGenerateConfigReality(t *testing.T) {
 	data := &MasterConfigResponse{
 		Node:  MasterNode{NodeType: "reality"},
 		Users: testUsers(),
 	}
 
-	raw, err := GenerateConfig(data)
+	raw, err := GenerateConfig(data, testLocalKeys())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -82,7 +90,7 @@ func TestGenerateConfigWeb(t *testing.T) {
 		Users: testUsers(),
 	}
 
-	raw, err := GenerateConfig(data)
+	raw, err := GenerateConfig(data, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -105,22 +113,24 @@ func TestGenerateConfigRelayRequiresUpstream(t *testing.T) {
 		UpstreamNode: nil,
 	}
 
-	_, err := GenerateConfig(data)
+	_, err := GenerateConfig(data, testLocalKeys())
 	if err == nil {
 		t.Fatal("expected error when relay node has no upstream, got nil")
 	}
 }
 
 func TestGenerateConfigRelayWithUpstream(t *testing.T) {
+	upstreamPubKey := "upstream-public-key"
 	data := &MasterConfigResponse{
 		Node:  MasterNode{NodeType: "relay"},
 		Users: testUsers(),
 		UpstreamNode: &MasterNode{
-			Address: "upstream.example.com",
+			Address:       "upstream.example.com",
+			RealityPubKey: &upstreamPubKey,
 		},
 	}
 
-	raw, err := GenerateConfig(data)
+	raw, err := GenerateConfig(data, testLocalKeys())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -131,6 +141,12 @@ func TestGenerateConfigRelayWithUpstream(t *testing.T) {
 	}
 
 	outbounds := config["outbounds"].([]any)
+	for i := 0; i < 2; i++ {
+		reality := outbounds[i].(map[string]any)["tls"].(map[string]any)["reality"].(map[string]any)
+		if reality["public_key"] != upstreamPubKey {
+			t.Errorf("outbound[%d].tls.reality.public_key = %v, want %v", i, reality["public_key"], upstreamPubKey)
+		}
+	}
 	for i := 0; i < 4; i++ {
 		ob := outbounds[i].(map[string]any)
 		if ob["server"] != "upstream.example.com" {
@@ -144,7 +160,7 @@ func TestGenerateConfigUnknownNodeType(t *testing.T) {
 		Node: MasterNode{NodeType: "unknown"},
 	}
 
-	_, err := GenerateConfig(data)
+	_, err := GenerateConfig(data, nil)
 	if err == nil {
 		t.Fatal("expected error for unknown node type, got nil")
 	}

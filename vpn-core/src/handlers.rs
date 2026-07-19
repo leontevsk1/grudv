@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::{
     db,
-    models::{NodeCreateRequest, NupConfigResponse, UserUpsertRequest},
+    models::{NodeCreateRequest, NodeKeysRequest, NupConfigResponse, UserUpsertRequest},
 };
 
 #[derive(Clone)]
@@ -316,6 +316,33 @@ pub async fn get_nup_config(
     };
 
     (StatusCode::OK, Json(response)).into_response()
+}
+
+pub async fn set_node_keys(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<NodeKeysRequest>,
+) -> impl IntoResponse {
+    let join_token = extract_bearer(&headers).unwrap_or_default();
+    if join_token.is_empty() {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+
+    match db::set_node_reality_keys(
+        &state.db,
+        &join_token,
+        &payload.public_key,
+        &payload.short_id,
+    )
+    .await
+    {
+        Ok(rows) if rows > 0 => StatusCode::OK.into_response(),
+        Ok(_) => StatusCode::UNAUTHORIZED.into_response(),
+        Err(e) => {
+            log::error!("Ошибка сохранения reality-ключей узла: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
 }
 
 // -----------------------------------------------------------------

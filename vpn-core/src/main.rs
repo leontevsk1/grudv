@@ -57,6 +57,7 @@ async fn main() {
         .route("/api/v1/nodes/{id}", delete(handlers::delete_node))
         // Pull-конфигурация (для nup)
         .route("/api/v1/nup/config", get(handlers::get_nup_config))
+        .route("/api/v1/nup/node-keys", post(handlers::set_node_keys))
         // Подписка для клиентов
         .route("/api/sub/{tg_id}", get(handlers::get_sub))
         .with_state(state);

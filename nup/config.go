@@ -7,13 +7,14 @@ import (
 )
 
 type Config struct {
-	MasterURL        string // URL нашего vpn-core (например, http://127.0.0.1:8443)
-	NodeJoinToken    string // Статичный Bearer токен для авторизации на Мастере
-	NodeType         string // 'reality', 'web', 'relay'
-	Domain           string // Публичный домен или IP этого воркера
-	ConfigPath       string // Путь к config.json для sing-box
-	ContainerEngine  string // 'podman' или 'docker' — определяется автоматически
-	ContainerName    string // Имя контейнера sing-box для restart
+	MasterURL       string // URL нашего vpn-core (например, http://127.0.0.1:8443)
+	NodeJoinToken   string // Статичный Bearer токен для авторизации на Мастере
+	NodeType        string // 'reality', 'web', 'relay'
+	Domain          string // Публичный домен или IP этого воркера
+	ConfigPath      string // Путь к config.json для sing-box
+	RealityKeyPath  string // Путь к локальному файлу с приватным reality-ключом
+	ContainerEngine string // 'podman' или 'docker' — определяется автоматически
+	ContainerName   string // Имя контейнера sing-box для restart
 }
 
 func LoadConfig() *Config {
@@ -37,12 +38,18 @@ func LoadConfig() *Config {
 		containerName = "sing-box-worker"
 	}
 
+	realityKeyPath := os.Getenv("NUP_REALITY_KEY_PATH")
+	if realityKeyPath == "" {
+		realityKeyPath = "/etc/sing-box/reality.key"
+	}
+
 	return &Config{
 		MasterURL:       masterURL,
 		NodeJoinToken:   os.Getenv("NODE_JOIN_TOKEN"),
 		NodeType:        nodeType,
 		Domain:          os.Getenv("DOMAIN"),
 		ConfigPath:      configPath,
+		RealityKeyPath:  realityKeyPath,
 		ContainerEngine: detectContainerEngine(),
 		ContainerName:   containerName,
 	}

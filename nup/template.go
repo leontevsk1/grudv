@@ -18,12 +18,14 @@ type MasterUser struct {
 }
 
 type MasterNode struct {
-	ID             int    `json:"id"`
-	Name           string `json:"name"`
-	Address        string `json:"address"`
-	NodeType       string `json:"node_type"`
-	UpstreamNodeID *int   `json:"upstream_node_id"`
-	JoinToken      string `json:"join_token"`
+	ID             int     `json:"id"`
+	Name           string  `json:"name"`
+	Address        string  `json:"address"`
+	NodeType       string  `json:"node_type"`
+	UpstreamNodeID *int    `json:"upstream_node_id"`
+	JoinToken      string  `json:"join_token"`
+	RealityPubKey  *string `json:"reality_pub_key"`
+	RealityShortID *string `json:"reality_short_id"`
 }
 
 type MasterConfigResponse struct {
@@ -54,14 +56,14 @@ type SingBoxNaiveUser struct {
 	Password string `json:"password"`
 }
 
-func GenerateConfig(data *MasterConfigResponse) ([]byte, error) {
+func GenerateConfig(data *MasterConfigResponse, localKeys *RealityLocalKeys) ([]byte, error) {
 	switch data.Node.NodeType {
 	case "reality":
-		return buildRealityConfig(data)
+		return buildRealityConfig(data, localKeys)
 	case "web":
 		return buildWebConfig(data)
 	case "relay":
-		return buildRelayConfig(data)
+		return buildRelayConfig(data, localKeys)
 	default:
 		return nil, fmt.Errorf("unknown node type: %s", data.Node.NodeType)
 	}
@@ -70,7 +72,7 @@ func GenerateConfig(data *MasterConfigResponse) ([]byte, error) {
 // -----------------------------------------------------------------
 // 1. DIRECT-REALITY WORKER
 // -----------------------------------------------------------------
-func buildRealityConfig(data *MasterConfigResponse) ([]byte, error) {
+func buildRealityConfig(data *MasterConfigResponse, localKeys *RealityLocalKeys) ([]byte, error) {
 	var vlessUsers []SingBoxUser
 	var hy2Users []SingBoxHy2User
 	var tuicUsers []SingBoxTuicUser // Исправлен тип
@@ -159,6 +161,9 @@ func buildRealityConfig(data *MasterConfigResponse) ([]byte, error) {
 
 	vlessInbound := inbounds[0].(map[string]any)
 	vlessInbound["users"] = vlessUsers
+	if err := setRealityKeys(vlessInbound, localKeys); err != nil {
+		return nil, err
+	}
 
 	hy2Inbound := inbounds[1].(map[string]any)
 	hy2Inbound["users"] = hy2Users
@@ -269,7 +274,7 @@ func buildWebConfig(data *MasterConfigResponse) ([]byte, error) {
 // -----------------------------------------------------------------
 // 3. RELAY WORKER
 // -----------------------------------------------------------------
-func buildRelayConfig(data *MasterConfigResponse) ([]byte, error) {
+func buildRelayConfig(data *MasterConfigResponse, localKeys *RealityLocalKeys) ([]byte, error) {
 	var vlessInboundUsers []SingBoxUser
 	var hy2InboundUsers []SingBoxHy2User
 	var tuicInboundUsers []SingBoxTuicUser // Исправлен тип
@@ -393,6 +398,9 @@ func buildRelayConfig(data *MasterConfigResponse) ([]byte, error) {
 	// Наполнение Inbounds
 	inbounds := configMap["inbounds"].([]any)
 	inbounds[0].(map[string]any)["users"] = vlessInboundUsers
+	if err := setRealityKeys(inbounds[0].(map[string]any), localKeys); err != nil {
+		return nil, err
+	}
 	inbounds[1].(map[string]any)["users"] = hy2InboundUsers
 	inbounds[2].(map[string]any)["users"] = tuicInboundUsers
 
@@ -407,6 +415,14 @@ func buildRelayConfig(data *MasterConfigResponse) ([]byte, error) {
 
 	for i := 0; i < 4; i++ {
 		outbounds[i].(map[string]any)["server"] = upstream.Address
+	}
+
+	if upstream.RealityPubKey == nil || *upstream.RealityPubKey == "" {
+		return nil, fmt.Errorf("upstream node %d has no reality public key yet", upstream.ID)
+	}
+	for i := 0; i < 2; i++ {
+		reality := outbounds[i].(map[string]any)["tls"].(map[string]any)["reality"].(map[string]any)
+		reality["public_key"] = *upstream.RealityPubKey
 	}
 
 	// VLESS Upstream

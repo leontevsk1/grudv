@@ -19,19 +19,32 @@ func main() {
 		log.Fatal("Критическая ошибка: NODE_JOIN_TOKEN не задан в окружении.")
 	}
 
+	var localKeys *RealityLocalKeys
+	if cfg.NodeType == "reality" || cfg.NodeType == "relay" {
+		keys, err := EnsureRealityLocalKeys(cfg.RealityKeyPath)
+		if err != nil {
+			log.Fatalf("Критическая ошибка подготовки reality-ключей: %v", err)
+		}
+		localKeys = keys
+
+		if err := PushRealityPublicKey(cfg.MasterURL, cfg.NodeJoinToken, localKeys); err != nil {
+			log.Printf("Ошибка отправки публичного reality-ключа на Мастер: %v", err)
+		}
+	}
+
 	// Запускаем бесконечный цикл с тикером в 1 минуту по ТЗ
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
 	// Первый запуск при старте демона
-	fetchAndApplyConfig(cfg)
+	fetchAndApplyConfig(cfg, localKeys)
 
 	for range ticker.C {
-		fetchAndApplyConfig(cfg)
+		fetchAndApplyConfig(cfg, localKeys)
 	}
 }
 
-func fetchAndApplyConfig(cfg *Config) {
+func fetchAndApplyConfig(cfg *Config, localKeys *RealityLocalKeys) {
 	url := fmt.Sprintf("%s/api/v1/nup/config", cfg.MasterURL)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -67,7 +80,7 @@ func fetchAndApplyConfig(cfg *Config) {
 	}
 
 	// Генерируем итоговый конфиг для sing-box
-	newConfigBytes, err := GenerateConfig(&masterData)
+	newConfigBytes, err := GenerateConfig(&masterData, localKeys)
 	if err != nil {
 		log.Printf("Ошибка генерации конфигурации: %v", err)
 		return

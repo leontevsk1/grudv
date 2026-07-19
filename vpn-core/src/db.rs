@@ -118,6 +118,24 @@ pub async fn delete_node(pool: &PgPool, id: i32) -> Result<u64, sqlx::Error> {
     Ok(result.rows_affected())
 }
 
+pub async fn set_node_reality_keys(
+    pool: &PgPool,
+    join_token: &str,
+    public_key: &str,
+    short_id: &str,
+) -> Result<u64, sqlx::Error> {
+    let result = sqlx::query!(
+        "UPDATE nodes SET reality_pub_key = $1, reality_short_id = $2 WHERE join_token = $3",
+        public_key,
+        short_id,
+        join_token
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected())
+}
+
 pub async fn get_node_by_token(
     pool: &PgPool,
     join_token: &str,

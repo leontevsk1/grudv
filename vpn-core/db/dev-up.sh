@@ -9,4 +9,5 @@ done
 
 cd ..
 export DATABASE_URL="postgres://master_user:$(grep -oP '(?<=POSTGRES_PASSWORD=).*' db/.env)@localhost:5432/vpn_core"
+sqlx migrate run
 cargo sqlx prepare

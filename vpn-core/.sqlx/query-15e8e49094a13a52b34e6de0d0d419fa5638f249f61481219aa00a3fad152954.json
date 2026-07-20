@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        INSERT INTO nodes (name, address, node_type, status, join_token, upstream_node_id)\n        VALUES ($1, $2, $3, 'active', $4, $5)\n        RETURNING *\n        ",
+  "query": "\n        INSERT INTO nodes (name, address, node_type, status, join_token, upstream_node_id)\n        VALUES ($1, $2, $3, 'active', $4, $5)\n        ON CONFLICT (name) DO UPDATE SET\n            address = EXCLUDED.address,\n            node_type = EXCLUDED.node_type,\n            status = 'active',\n            join_token = EXCLUDED.join_token,\n            upstream_node_id = EXCLUDED.upstream_node_id,\n            reality_pub_key = NULL,\n            reality_short_id = NULL\n        RETURNING *\n        ",
   "describe": {
     "columns": [
       {
@@ -76,5 +76,5 @@
       true
     ]
   },
-  "hash": "a8806ead7d0034d590cfcbd3f169ee26050a134cd066a116ffcb454ab8d15c56"
+  "hash": "15e8e49094a13a52b34e6de0d0d419fa5638f249f61481219aa00a3fad152954"
 }

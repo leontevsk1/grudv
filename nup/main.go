@@ -86,12 +86,18 @@ func fetchAndApplyConfig(cfg *Config, localKeys *RealityLocalKeys) {
 		return
 	}
 
+	certChanged, err := SyncCertificate(cfg.NodeType, cfg.Domain)
+	if err != nil {
+		log.Printf("Ошибка синхронизации TLS-сертификата от Caddy: %v", err)
+	}
+
 	configPath := cfg.ConfigPath
 
 	// Проверяем, изменился ли конфиг, чтобы зря не дергать Podman
 	oldConfigBytes, err := os.ReadFile(configPath)
-	if err == nil && bytes.Equal(oldConfigBytes, newConfigBytes) {
-		// Конфиг идентичен, ничего не делаем
+	configChanged := err != nil || !bytes.Equal(oldConfigBytes, newConfigBytes)
+
+	if !configChanged && !certChanged {
 		return
 	}
 

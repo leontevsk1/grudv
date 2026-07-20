@@ -12,7 +12,7 @@ CREATE TABLE users (
 
 CREATE TABLE nodes (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(50) NOT NULL,
+    name VARCHAR(50) UNIQUE NOT NULL,
     address VARCHAR(100) NOT NULL,
     node_type VARCHAR(20) NOT NULL, -- 'reality', 'web', 'relay'
     status VARCHAR(20) NOT NULL,    -- 'active', 'offline'

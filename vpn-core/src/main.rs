@@ -31,6 +31,13 @@ async fn main() {
 
     log::info!("Подключение к БД установлено");
 
+    sqlx::migrate!()
+        .run(&pool)
+        .await
+        .expect("Ошибка применения миграций БД");
+
+    log::info!("Миграции БД применены");
+
     let state = AppState {
         db: pool,
         bot_secret,

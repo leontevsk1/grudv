@@ -3,6 +3,7 @@ WORKDIR /src
 RUN apk add --no-cache musl-dev
 COPY Cargo.toml Cargo.lock ./
 COPY .sqlx ./.sqlx
+COPY migrations ./migrations
 COPY src ./src
 ENV SQLX_OFFLINE=true
 RUN cargo build --release

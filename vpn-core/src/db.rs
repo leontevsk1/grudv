@@ -85,6 +85,11 @@ pub async fn update_payment_status(
 // УЗЛЫ (NODES)
 // -----------------------------------------------------------------
 
+// Переустановка воркера с тем же именем узла (например, пересоздание сервера
+// после смены ОС) не должна плодить дубликат — обновляем существующую
+// запись новым join_token и сбрасываем reality-ключи прежнего физического
+// сервера, потому что они гарантированно невалидны для нового; nup пришлёт
+// актуальные при первом запуске (см. PushRealityPublicKey в nup/reality.go).
 pub async fn create_node(
     pool: &PgPool,
     name: &str,
@@ -98,6 +103,14 @@ pub async fn create_node(
         r#"
         INSERT INTO nodes (name, address, node_type, status, join_token, upstream_node_id)
         VALUES ($1, $2, $3, 'active', $4, $5)
+        ON CONFLICT (name) DO UPDATE SET
+            address = EXCLUDED.address,
+            node_type = EXCLUDED.node_type,
+            status = 'active',
+            join_token = EXCLUDED.join_token,
+            upstream_node_id = EXCLUDED.upstream_node_id,
+            reality_pub_key = NULL,
+            reality_short_id = NULL
         RETURNING *
         "#,
         name,

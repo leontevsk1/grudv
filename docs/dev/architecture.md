@@ -16,7 +16,7 @@
 
 **nup** (Go, `nup/`) — демон, который живёт на воркере (не в контейнере, а прямо на хосте). Раз в минуту стучится в vpn-core за списком пользователей, собирает под него `config.json` для sing-box, перезаписывает файл, перезапускает контейнер sing-box (`podman restart`, `docker restart` как fallback), и накладывает `tc`-лимиты на бесплатных/просроченных пользователей.
 
-Плюс PostgreSQL — таблицы `users`, `nodes`, `payment_requests` (`vpn-core/db/init.sql`), и сам sing-box — крутится в контейнере, конфиг ему пишет `nup`.
+Плюс PostgreSQL — таблицы `users`, `nodes`, `payment_requests` (`vpn-core/migrations/`, накатываются автоматически через `sqlx::migrate!` при старте vpn-core), и сам sing-box — крутится в контейнере, конфиг ему пишет `nup`.
 
 ## Как это работает вместе
 

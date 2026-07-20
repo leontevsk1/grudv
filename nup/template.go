@@ -118,8 +118,8 @@ func buildRealityConfig(data *MasterConfigResponse, localKeys *RealityLocalKeys)
 				"tls": {
 					"enabled": true,
 					"alpn": ["h3"],
-					"certificate_path": "/path/to/fullchain.pem",
-					"key_path": "/path/to/privkey.pem"
+					"certificate_path": "/etc/sing-box/fullchain.pem",
+					"key_path": "/etc/sing-box/privkey.pem"
 				}
 			},
 			{
@@ -131,8 +131,8 @@ func buildRealityConfig(data *MasterConfigResponse, localKeys *RealityLocalKeys)
 				"tls": {
 					"enabled": true,
 					"alpn": ["h3"],
-					"certificate_path": "/path/to/fullchain.pem",
-					"key_path": "/path/to/privkey.pem"
+					"certificate_path": "/etc/sing-box/fullchain.pem",
+					"key_path": "/etc/sing-box/privkey.pem"
 				}
 			}
 		],
@@ -222,8 +222,8 @@ func buildWebConfig(data *MasterConfigResponse) ([]byte, error) {
 				"listen_port": 8443,
 				"tls": {
 					"enabled": true,
-					"certificate_path": "/path/to/fullchain.pem",
-					"key_path": "/path/to/privkey.pem",
+					"certificate_path": "/etc/sing-box/fullchain.pem",
+					"key_path": "/etc/sing-box/privkey.pem",
 					"alpn": ["h3"]
 				}
 			},
@@ -235,8 +235,8 @@ func buildWebConfig(data *MasterConfigResponse) ([]byte, error) {
 				"congestion_control": "bbr",
 				"tls": {
 					"enabled": true,
-					"certificate_path": "/path/to/fullchain.pem",
-					"key_path": "/path/to/privkey.pem",
+					"certificate_path": "/etc/sing-box/fullchain.pem",
+					"key_path": "/etc/sing-box/privkey.pem",
 					"alpn": ["h3"]
 				}
 			}
@@ -319,8 +319,8 @@ func buildRelayConfig(data *MasterConfigResponse, localKeys *RealityLocalKeys) (
 				"tls": {
 					"enabled": true,
 					"alpn": ["h3"],
-					"certificate_path": "/path/to/fullchain.pem",
-					"key_path": "/path/to/privkey.pem"
+					"certificate_path": "/etc/sing-box/fullchain.pem",
+					"key_path": "/etc/sing-box/privkey.pem"
 				}
 			},
 			{
@@ -332,8 +332,8 @@ func buildRelayConfig(data *MasterConfigResponse, localKeys *RealityLocalKeys) (
 				"tls": {
 					"enabled": true,
 					"alpn": ["h3"],
-					"certificate_path": "/path/to/fullchain.pem",
-					"key_path": "/path/to/privkey.pem"
+					"certificate_path": "/etc/sing-box/fullchain.pem",
+					"key_path": "/etc/sing-box/privkey.pem"
 				}
 			}
 		],

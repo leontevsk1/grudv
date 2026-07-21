@@ -1,0 +1,12 @@
+site_name: GradVPN — документация разработчика
+docs_dir: docs/dev
+theme:
+  name: material
+  language: ru
+
+nav:
+  - Обзор: README.md
+  - Архитектура: architecture.md
+  - API: api.md
+  - CI/CD: ci-cd.md
+  - Известные проблемы: known-issues.md

@@ -1,5 +1,5 @@
 use crate::handlers::{build_sub_configs, extract_bearer};
-use crate::models::User;
+use crate::models::{Node, User};
 use axum::http::{HeaderMap, HeaderValue};
 use uuid::Uuid;
 
@@ -17,20 +17,39 @@ fn make_user(tier: &str) -> User {
     }
 }
 
-#[test]
-fn free_user_gets_only_vless() {
-    let user = make_user("free");
-    let configs = build_sub_configs(&user, "node.example.com");
+fn make_node(node_type: &str) -> Node {
+    Node {
+        id: 1,
+        name: "node".to_string(),
+        address: "node.example.com".to_string(),
+        node_type: node_type.to_string(),
+        status: "active".to_string(),
+        join_token: "token".to_string(),
+        reality_pub_key: Some("pubkey".to_string()),
+        reality_short_id: Some("shortid".to_string()),
+        obfs_password: None,
+        upstream_node_id: None,
+    }
+}
 
-    assert_eq!(configs.len(), 1);
+#[test]
+fn free_user_gets_reality_vless_hy2_and_tuic() {
+    let user = make_user("free");
+    let node = make_node("reality");
+    let configs = build_sub_configs(&user, &node);
+
+    assert_eq!(configs.len(), 3);
     assert!(configs[0].starts_with("vless://"));
-    assert!(!configs[0].contains("mark=100"));
+    assert!(configs[0].contains("security=reality"));
+    assert!(configs[1].starts_with("hy2://"));
+    assert!(configs[2].starts_with("tuic://"));
 }
 
 #[test]
 fn premium_user_gets_vless_hy2_and_tuic() {
     let user = make_user("premium");
-    let configs = build_sub_configs(&user, "node.example.com");
+    let node = make_node("reality");
+    let configs = build_sub_configs(&user, &node);
 
     assert_eq!(configs.len(), 3);
     assert!(configs[0].starts_with("vless://"));
@@ -39,14 +58,41 @@ fn premium_user_gets_vless_hy2_and_tuic() {
 }
 
 #[test]
-fn premium_user_without_hy2_and_tuic_gets_only_vless() {
+fn user_without_hy2_and_tuic_gets_only_vless() {
     let mut user = make_user("premium");
     user.hy2_password = None;
     user.tuic_uuid = None;
+    let node = make_node("reality");
 
-    let configs = build_sub_configs(&user, "node.example.com");
+    let configs = build_sub_configs(&user, &node);
 
     assert_eq!(configs.len(), 1);
+}
+
+#[test]
+fn reality_node_without_keys_yet_omits_vless() {
+    let user = make_user("free");
+    let mut node = make_node("reality");
+    node.reality_pub_key = None;
+    node.reality_short_id = None;
+
+    let configs = build_sub_configs(&user, &node);
+
+    assert_eq!(configs.len(), 2);
+    assert!(configs[0].starts_with("hy2://"));
+    assert!(configs[1].starts_with("tuic://"));
+}
+
+#[test]
+fn web_node_gets_httpupgrade_vless() {
+    let user = make_user("free");
+    let node = make_node("web");
+
+    let configs = build_sub_configs(&user, &node);
+
+    assert!(configs[0].starts_with("vless://"));
+    assert!(configs[0].contains("type=httpupgrade"));
+    assert!(configs[0].contains("path=/your-secret-health-path"));
 }
 
 #[test]

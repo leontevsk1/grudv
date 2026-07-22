@@ -51,6 +51,7 @@ async fn main() {
             get(handlers::get_user).delete(handlers::delete_user),
         )
         // Управление заявками на оплату (для бота/админа)
+        .route("/api/v1/payments", post(handlers::create_payment_request))
         .route(
             "/api/v1/payments/{id}/approve",
             post(handlers::approve_payment),

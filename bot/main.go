@@ -117,18 +117,25 @@ func main() {
 }
 
 func handleCallback(bot *tgbotapi.BotAPI, core *CoreClient, cb *tgbotapi.CallbackQuery, adminID int64) {
+	bot.Request(tgbotapi.NewCallback(cb.ID, ""))
+
+	log.Printf("DEBUG callback: from=%d adminID=%d data=%q", cb.From.ID, adminID, cb.Data)
+
 	if cb.From.ID != adminID {
+		log.Printf("DEBUG callback: отклонён, from != adminID")
 		return // На кнопки может нажимать только админ
 	}
 
 	parts := strings.Split(cb.Data, "_")
 	if len(parts) != 3 {
+		log.Printf("DEBUG callback: неверный формат data, parts=%v", parts)
 		return
 	}
 
 	action := parts[0]
-	paymentID, _ := strconv.Atoi(parts[1])
-	userTgID, _ := strconv.ParseInt(parts[2], 10, 64)
+	paymentID, paymentErr := strconv.Atoi(parts[1])
+	userTgID, userErr := strconv.ParseInt(parts[2], 10, 64)
+	log.Printf("DEBUG callback: action=%s paymentID=%d (err=%v) userTgID=%d (err=%v)", action, paymentID, paymentErr, userTgID, userErr)
 
 	var text string
 	if action == "approve" {
@@ -138,9 +145,11 @@ func handleCallback(bot *tgbotapi.BotAPI, core *CoreClient, cb *tgbotapi.Callbac
 			log.Printf("Ошибка аппрува платежа %d на ядре: %v", paymentID, err)
 			return
 		}
+		log.Printf("DEBUG callback: ApprovePayment(%d) успешно", paymentID)
 
 		// Запрос на ручной перевод юзера в премиум (запасной/явный апдейт)
-		_ = core.CreateUser(userTgID, "premium")
+		createErr := core.CreateUser(userTgID, "premium")
+		log.Printf("DEBUG callback: CreateUser(%d, premium) err=%v", userTgID, createErr)
 
 		text = fmt.Sprintf("Заявка #%d подтверждена. Пользователю выдан Premium.", paymentID)
 		bot.Send(tgbotapi.NewMessage(userTgID, "🎉 Ваша оплата подтверждена! Premium тариф успешно активирован. Проверьте новые ключи в /info."))

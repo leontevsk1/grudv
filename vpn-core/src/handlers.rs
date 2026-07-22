@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::{
     db,
-    models::{NodeCreateRequest, NodeKeysRequest, NupConfigResponse, UserUpsertRequest},
+    models::{Node, NodeCreateRequest, NodeKeysRequest, NupConfigResponse, UserUpsertRequest},
 };
 
 #[derive(Clone)]
@@ -28,24 +28,49 @@ pub fn extract_bearer(headers: &HeaderMap) -> Option<String> {
         .and_then(|s| s.strip_prefix("Bearer ").map(String::from))
 }
 
+// Хендшейк-хост Reality зашит в nup/template.go (buildRealityConfig, server_name) —
+// клиент должен указывать тот же sni, иначе Reality-хендшейк с сервером не пройдёт.
+const REALITY_SNI: &str = "telemetry.mozilla.org";
+
 // Строит список ссылок для одного узла под конкретного пользователя.
-// Троттлинг free-пользователей идёт на сервере по UUID (см. nup/template.go),
-// а не по параметрам ссылки — клиент не может повлиять на свою полосу.
-pub fn build_sub_configs(user: &crate::models::User, node_address: &str) -> Vec<String> {
-    let mut configs = vec![format!(
-        "vless://{}@{}?encryption=none&security=tls&type=httpupgrade",
-        user.vless_uuid.unwrap_or_default(),
-        node_address
-    )];
+// Троттлинг идёт на сервере по routing_mark (см. nup/utils.go: ApplyTrafficShaping),
+// одинаково для всех протоколов — поэтому HY2/TUIC отдаются всем tier'ам без разбора.
+pub fn build_sub_configs(user: &crate::models::User, node: &Node) -> Vec<String> {
+    let mut configs = Vec::new();
 
-    if user.tier != "free" {
-        if let Some(hy2_pass) = &user.hy2_password {
-            configs.push(format!("hy2://{}@{}", hy2_pass, node_address));
+    match node.node_type.as_str() {
+        "reality" | "relay" => {
+            if let (Some(pbk), Some(sid)) = (&node.reality_pub_key, &node.reality_short_id) {
+                configs.push(format!(
+                    "vless://{}@{}:443?encryption=none&security=reality&type=tcp&flow=xtls-rprx-vision&sni={}&fp=chrome&pbk={}&sid={}",
+                    user.vless_uuid.unwrap_or_default(),
+                    node.address,
+                    REALITY_SNI,
+                    pbk,
+                    sid
+                ));
+            }
         }
+        _ => {
+            configs.push(format!(
+                "vless://{}@{}:443?encryption=none&security=tls&type=httpupgrade&path=/your-secret-health-path",
+                user.vless_uuid.unwrap_or_default(),
+                node.address
+            ));
+        }
+    }
 
-        if let Some(tuic_uuid) = user.tuic_uuid {
-            configs.push(format!("tuic://{}@{}", tuic_uuid, node_address));
-        }
+    if let Some(hy2_pass) = &user.hy2_password {
+        configs.push(format!("hy2://{}@{}:8443", hy2_pass, node.address));
+    }
+
+    if let Some(tuic_uuid) = user.tuic_uuid
+        && let Some(tuic_pass) = &user.tuic_password
+    {
+        configs.push(format!(
+            "tuic://{}:{}@{}:443?congestion_control=bbr&alpn=h3",
+            tuic_uuid, tuic_pass, node.address
+        ));
     }
 
     configs
@@ -146,6 +171,25 @@ pub async fn delete_user(
 // -----------------------------------------------------------------
 // ПЛАТЕЖИ (API для Бота/Админа)
 // -----------------------------------------------------------------
+
+pub async fn create_payment_request(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<crate::models::PaymentCreateRequest>,
+) -> impl IntoResponse {
+    let token = extract_bearer(&headers).unwrap_or_default();
+    if token != state.bot_secret {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+
+    match db::create_payment_request(&state.db, payload.tg_id).await {
+        Ok(id) => (StatusCode::CREATED, Json(serde_json::json!({ "id": id }))).into_response(),
+        Err(e) => {
+            log::error!("Ошибка создания заявки на оплату: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
 
 pub async fn approve_payment(
     State(state): State<AppState>,
@@ -361,7 +405,7 @@ pub async fn get_sub(State(state): State<AppState>, Path(tg_id): Path<i64>) -> i
 
                 let mut configs = Vec::new();
                 for node in nodes {
-                    configs.extend(build_sub_configs(&user, &node.address));
+                    configs.extend(build_sub_configs(&user, &node));
                 }
 
                 let combined = configs.join("\n");

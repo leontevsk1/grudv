@@ -59,6 +59,17 @@ pub async fn delete_user(pool: &PgPool, tg_id: i64) -> Result<u64, sqlx::Error> 
 // ПЛАТЕЖИ
 // -----------------------------------------------------------------
 
+pub async fn create_payment_request(pool: &PgPool, tg_id: i64) -> Result<i32, sqlx::Error> {
+    let record = sqlx::query!(
+        "INSERT INTO payment_requests (tg_id, status) VALUES ($1, 'pending') RETURNING id",
+        tg_id
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok(record.id)
+}
+
 pub async fn update_payment_status(
     pool: &PgPool,
     payment_id: i32,

@@ -37,9 +37,6 @@ func main() {
 	u.Timeout = 60
 	updates := bot.GetUpdatesChan(u)
 
-	// Счетчик для имитации ID заявок в рамках MVP (в боевой системе пишется в payment_requests)
-	paymentCounter := 1000
-
 	for update := range updates {
 		// 1. Обработка нажатий инлайн-кнопок админом
 		if update.CallbackQuery != nil {
@@ -91,17 +88,23 @@ func main() {
 			bot.Send(msgOut)
 
 		case "Я оплатил":
-			paymentCounter++
+			paymentID, err := core.CreatePaymentRequest(chatID)
+			if err != nil {
+				log.Printf("Ошибка создания заявки на оплату для %d: %v", chatID, err)
+				bot.Send(tgbotapi.NewMessage(chatID, "Не удалось отправить заявку, попробуйте позже."))
+				continue
+			}
+
 			// Уведомление пользователю
 			bot.Send(tgbotapi.NewMessage(chatID, "Заявка отправлена администратору на проверку. Ожидайте начисления подписки."))
 
 			// Отправка админу карточки на подтверждение
-			adminMsg := tgbotapi.NewMessage(adminID, fmt.Sprintf("User %d утверждает, что оплатил Premium.\nID транзакции: #%d", chatID, paymentCounter))
+			adminMsg := tgbotapi.NewMessage(adminID, fmt.Sprintf("User %d утверждает, что оплатил Premium.\nID транзакции: #%d", chatID, paymentID))
 
 			inlineKeyboard := tgbotapi.NewInlineKeyboardMarkup(
 				tgbotapi.NewInlineKeyboardRow(
-					tgbotapi.NewInlineKeyboardButtonData("Подтвердить", fmt.Sprintf("approve_%d_%d", paymentCounter, chatID)),
-					tgbotapi.NewInlineKeyboardButtonData("Отклонить", fmt.Sprintf("reject_%d_%d", paymentCounter, chatID)),
+					tgbotapi.NewInlineKeyboardButtonData("Подтвердить", fmt.Sprintf("approve_%d_%d", paymentID, chatID)),
+					tgbotapi.NewInlineKeyboardButtonData("Отклонить", fmt.Sprintf("reject_%d_%d", paymentID, chatID)),
 				),
 			)
 			adminMsg.ReplyMarkup = inlineKeyboard

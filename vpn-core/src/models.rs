@@ -60,6 +60,11 @@ pub struct NodeKeysRequest {
     pub short_id: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct PaymentCreateRequest {
+    pub tg_id: i64,
+}
+
 // -----------------------------------------------------------------
 // МОДЕЛИ ИСХОДЯЩИХ ОТВЕТОВ (API RESPONSES)
 // -----------------------------------------------------------------

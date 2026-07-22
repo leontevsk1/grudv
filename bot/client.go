@@ -30,6 +30,14 @@ type UserResponse struct {
 	TuicPassword  *string `json:"tuic_password"`
 }
 
+type PaymentCreateRequest struct {
+	TgID int64 `json:"tg_id"`
+}
+
+type PaymentCreateResponse struct {
+	ID int `json:"id"`
+}
+
 func NewCoreClient(url, secret string) *CoreClient {
 	return &CoreClient{
 		MasterURL: url,
@@ -91,6 +99,32 @@ func (c *CoreClient) GetUser(tgID int64) (*UserResponse, error) {
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (c *CoreClient) CreatePaymentRequest(tgID int64) (int, error) {
+	data, _ := json.Marshal(PaymentCreateRequest{TgID: tgID})
+	req, err := http.NewRequest("POST", c.MasterURL+"/api/v1/payments", bytes.NewBuffer(data))
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.BotSecret)
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return 0, fmt.Errorf("master returned status: %d", resp.StatusCode)
+	}
+
+	var payment PaymentCreateResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payment); err != nil {
+		return 0, err
+	}
+	return payment.ID, nil
 }
 
 func (c *CoreClient) ApprovePayment(paymentID int) error {

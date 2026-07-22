@@ -82,6 +82,34 @@ func TestGenerateConfigReality(t *testing.T) {
 	if len(tuicUsers) != 1 {
 		t.Errorf("tuic users = %d, want 1 (only premium has tuic creds)", len(tuicUsers))
 	}
+
+	assertRoutesByAuthUser(t, raw)
+}
+
+// "user" в route rules матчит имя процесса ОС клиента (metadata.ProcessInfo.UserName),
+// не аутентифицированного VLESS/HY2/TUIC-пользователя — с ним free/premium маршрутизация
+// никогда не срабатывает на сервере. Нужно именно "auth_user" (metadata.User).
+func assertRoutesByAuthUser(t *testing.T, raw []byte) {
+	t.Helper()
+	var config map[string]any
+	if err := json.Unmarshal(raw, &config); err != nil {
+		t.Fatalf("GenerateConfig produced invalid JSON: %v", err)
+	}
+
+	rules := config["route"].(map[string]any)["rules"].([]any)
+	foundAuthUser := false
+	for _, r := range rules {
+		rule := r.(map[string]any)
+		if _, bad := rule["user"]; bad {
+			t.Fatalf("route rule uses \"user\" (OS process name) instead of \"auth_user\": %v", rule)
+		}
+		if _, ok := rule["auth_user"]; ok {
+			foundAuthUser = true
+		}
+	}
+	if !foundAuthUser {
+		t.Fatal("expected at least one route rule matching by auth_user")
+	}
 }
 
 func TestGenerateConfigWeb(t *testing.T) {
@@ -104,6 +132,8 @@ func TestGenerateConfigWeb(t *testing.T) {
 	if len(naiveUsers) != 1 {
 		t.Errorf("naive users = %d, want 1 (only premium has naive creds)", len(naiveUsers))
 	}
+
+	assertRoutesByAuthUser(t, raw)
 }
 
 func TestGenerateConfigRelayRequiresUpstream(t *testing.T) {
@@ -153,6 +183,8 @@ func TestGenerateConfigRelayWithUpstream(t *testing.T) {
 			t.Errorf("outbound[%d].server = %v, want upstream.example.com", i, ob["server"])
 		}
 	}
+
+	assertRoutesByAuthUser(t, raw)
 }
 
 func TestGenerateConfigUnknownNodeType(t *testing.T) {

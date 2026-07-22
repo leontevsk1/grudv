@@ -144,8 +144,8 @@ func buildRealityConfig(data *MasterConfigResponse, localKeys *RealityLocalKeys)
 		"route": {
 			"rules": [
 				{ "ip_is_private": true, "action": "route", "outbound": "Block" },
-				{ "user": ["premium"], "action": "route", "outbound": "Direct-Premium" },
-				{ "user": ["free"], "action": "route", "outbound": "Direct-Free" }
+				{ "auth_user": ["premium"], "action": "route", "outbound": "Direct-Premium" },
+				{ "auth_user": ["free"], "action": "route", "outbound": "Direct-Free" }
 			],
 			"final": "Block"
 		}
@@ -249,8 +249,8 @@ func buildWebConfig(data *MasterConfigResponse) ([]byte, error) {
 		"route": {
 			"rules": [
 				{ "ip_is_private": true, "action": "route", "outbound": "Block" },
-				{ "user": ["premium"], "action": "route", "outbound": "Direct-Premium" },
-				{ "user": ["free"], "action": "route", "outbound": "Direct-Free" }
+				{ "auth_user": ["premium"], "action": "route", "outbound": "Direct-Premium" },
+				{ "auth_user": ["free"], "action": "route", "outbound": "Direct-Free" }
 			],
 			"final": "Block"
 		}
@@ -381,10 +381,10 @@ func buildRelayConfig(data *MasterConfigResponse, localKeys *RealityLocalKeys) (
 		"route": {
 			"rules": [
 				{ "ip_is_private": true, "action": "route", "outbound": "Block" },
-				{ "inbound": ["in-vless-reality"], "user": ["premium"], "action": "route", "outbound": "Upstream-TCP-Premium" },
-				{ "inbound": ["in-vless-reality"], "user": ["free"], "action": "route", "outbound": "Upstream-TCP-Free" },
-				{ "inbound": ["in-hysteria2", "in-tuic"], "user": ["premium"], "action": "route", "outbound": "Upstream-UDP-Premium" },
-				{ "inbound": ["in-hysteria2", "in-tuic"], "user": ["free"], "action": "route", "outbound": "Upstream-UDP-Free" }
+				{ "inbound": ["in-vless-reality"], "auth_user": ["premium"], "action": "route", "outbound": "Upstream-TCP-Premium" },
+				{ "inbound": ["in-vless-reality"], "auth_user": ["free"], "action": "route", "outbound": "Upstream-TCP-Free" },
+				{ "inbound": ["in-hysteria2", "in-tuic"], "auth_user": ["premium"], "action": "route", "outbound": "Upstream-UDP-Premium" },
+				{ "inbound": ["in-hysteria2", "in-tuic"], "auth_user": ["free"], "action": "route", "outbound": "Upstream-UDP-Free" }
 			],
 			"final": "Block"
 		}

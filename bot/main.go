@@ -35,6 +35,12 @@ func main() {
 	core := NewCoreClient(masterURL, botSecret)
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
+	// Telegram запоминает allowed_updates последнего вызова getUpdates и
+	// продолжает фильтровать по нему даже после рестарта бота, пока не
+	// передать список явно — с прошлого эксперимента здесь висел
+	// фильтр ["message"], из-за которого callback_query (нажатия кнопок)
+	// не долетали до бота вовсе.
+	u.AllowedUpdates = []string{"message", "callback_query"}
 	updates := bot.GetUpdatesChan(u)
 
 	for update := range updates {

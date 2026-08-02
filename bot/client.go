@@ -21,21 +21,26 @@ type UserUpsertRequest struct {
 }
 
 type UserResponse struct {
-	TgID          int64   `json:"tg_id"`
-	Tier          string  `json:"tier"`
-	ExpireAt      *string `json:"expire_at"`
-	VlessUUID     *string `json:"vless_uuid"`
-	Hy2Password   *string `json:"hy2_password"`
-	TuicUUID      *string `json:"tuic_uuid"`
-	TuicPassword  *string `json:"tuic_password"`
+	TgID         int64   `json:"tg_id"`
+	Tier         string  `json:"tier"`
+	ExpireAt     *string `json:"expire_at"`
+	VlessUUID    *string `json:"vless_uuid"`
+	Hy2Password  *string `json:"hy2_password"`
+	TuicUUID     *string `json:"tuic_uuid"`
+	TuicPassword *string `json:"tuic_password"`
 }
 
 type PaymentCreateRequest struct {
-	TgID int64 `json:"tg_id"`
+	TgID int64  `json:"tg_id"`
+	Code string `json:"code"`
 }
 
 type PaymentCreateResponse struct {
 	ID int `json:"id"`
+}
+
+type PaymentCodeResponse struct {
+	Code string `json:"code"`
 }
 
 func NewCoreClient(url, secret string) *CoreClient {
@@ -101,8 +106,56 @@ func (c *CoreClient) GetUser(tgID int64) (*UserResponse, error) {
 	return &user, nil
 }
 
-func (c *CoreClient) CreatePaymentRequest(tgID int64) (int, error) {
-	data, _ := json.Marshal(PaymentCreateRequest{TgID: tgID})
+func (c *CoreClient) GetPaymentCode(tgID int64) (string, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v1/users/%d/payment-code", c.MasterURL, tgID), nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.BotSecret)
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("master returned status: %d", resp.StatusCode)
+	}
+
+	var payload PaymentCodeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return "", err
+	}
+	return payload.Code, nil
+}
+
+func (c *CoreClient) GetFreeUsers() ([]UserResponse, error) {
+	req, err := http.NewRequest("GET", c.MasterURL+"/api/v1/free-users", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.BotSecret)
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("master returned status: %d", resp.StatusCode)
+	}
+
+	var users []UserResponse
+	if err := json.NewDecoder(resp.Body).Decode(&users); err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+func (c *CoreClient) CreatePaymentRequest(tgID int64, code string) (int, error) {
+	data, _ := json.Marshal(PaymentCreateRequest{TgID: tgID, Code: code})
 	req, err := http.NewRequest("POST", c.MasterURL+"/api/v1/payments", bytes.NewBuffer(data))
 	if err != nil {
 		return 0, err

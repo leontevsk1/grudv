@@ -31,7 +31,7 @@ jobs:
         working-directory: ${{ matrix.service }}
       - run: go vet ./...
         working-directory: ${{ matrix.service }}
-        
+
   rust-test:
     needs: rust-build
     runs-on: ubuntu-latest
@@ -56,7 +56,7 @@ jobs:
           go-version: "1.26"
       - run: go test ./...
         working-directory: ${{ matrix.service }}
-        
+
   build-and-push:
     needs: [rust-build, go-build]
     if: github.ref == 'refs/heads/main'
@@ -81,3 +81,36 @@ jobs:
           context: ./bot
           push: true
           tags: ghcr.io/${{ github.repository }}/bot:${{ github.sha }}
+
+  deploy-master:
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      - run: |
+          ssh -o StrictHostKeyChecking=accept-new "${{ secrets.MASTER_SSH_USER }}@${{ secrets.MASTER_SSH_HOST }}" \
+            "cd /opt/vpn && sed -i 's/^IMAGE_TAG=.*/IMAGE_TAG=${{ github.sha }}/' .env && podman-compose pull vpn-core && podman-compose up -d vpn-core"
+      - name: Smoke test
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new "${{ secrets.MASTER_SSH_USER }}@${{ secrets.MASTER_SSH_HOST }}" \
+            "curl -sf -o /dev/null -w '%{http_code}' http://127.0.0.1:8443/health" | grep -q 200
+
+  deploy-bot:
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      - run: |
+          ssh -o StrictHostKeyChecking=accept-new "${{ secrets.BOT_SSH_USER }}@${{ secrets.BOT_SSH_HOST }}" \
+            "cd /opt/bot && sed -i 's/^IMAGE_TAG=.*/IMAGE_TAG=${{ github.sha }}/' .env && podman-compose pull bot && podman-compose up -d bot"
+      - name: Проверка, что контейнер bot запустился и не упал сразу
+        run: |
+          sleep 5
+          ssh -o StrictHostKeyChecking=accept-new "${{ secrets.BOT_SSH_USER }}@${{ secrets.BOT_SSH_HOST }}" \
+            "podman inspect bot --format '{{.State.Status}}'" | grep -q running

@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{NaiveDate, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
@@ -18,6 +18,13 @@ pub struct User {
     pub hy2_password: Option<String>,
     pub tuic_uuid: Option<Uuid>,
     pub tuic_password: Option<String>,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+pub struct PaymentCode {
+    pub tg_id: i64,
+    pub code_date: NaiveDate,
+    pub code: String,
 }
 
 #[derive(Debug, Serialize, FromRow)]
@@ -63,6 +70,7 @@ pub struct NodeKeysRequest {
 #[derive(Debug, Deserialize)]
 pub struct PaymentCreateRequest {
     pub tg_id: i64,
+    pub code: String,
 }
 
 // -----------------------------------------------------------------

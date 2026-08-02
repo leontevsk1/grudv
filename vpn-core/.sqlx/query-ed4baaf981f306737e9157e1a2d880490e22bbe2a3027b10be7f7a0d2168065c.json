@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM payment_codes WHERE tg_id = $1 AND code_date = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tg_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "code_date",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 2,
+        "name": "code",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ed4baaf981f306737e9157e1a2d880490e22bbe2a3027b10be7f7a0d2168065c"
+}

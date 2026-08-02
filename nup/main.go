@@ -11,8 +11,10 @@ import (
 	"time"
 )
 
+var version = "dev"
+
 func main() {
-	log.Println("Запуск Go-демона nup...")
+	log.Printf("Запуск Go-демона nup (версия %s)...", version)
 	cfg := LoadConfig()
 
 	if cfg.NodeJoinToken == "" {
@@ -32,6 +34,10 @@ func main() {
 		}
 	}
 
+	// Отдельный, более редкий тикер — не завязан на минутный цикл конфигурации,
+	// чтобы проверка GitHub Releases не замедляла и не спамила основной poll.
+	go runSelfUpdateLoop(cfg)
+
 	// Запускаем бесконечный цикл с тикером в 1 минуту по ТЗ
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
@@ -41,6 +47,17 @@ func main() {
 
 	for range ticker.C {
 		fetchAndApplyConfig(cfg, localKeys)
+	}
+}
+
+func runSelfUpdateLoop(cfg *Config) {
+	ticker := time.NewTicker(12 * time.Hour)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		if err := CheckAndSelfUpdate(cfg, version); err != nil {
+			log.Printf("Ошибка самообновления nup: %v", err)
+		}
 	}
 }
 

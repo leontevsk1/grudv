@@ -6,6 +6,8 @@ import (
 	"os/exec"
 )
 
+const GhRepo = "leontevsk1/grudv"
+
 type Config struct {
 	MasterURL       string // URL нашего vpn-core (например, http://127.0.0.1:8443)
 	NodeJoinToken   string // Статичный Bearer токен для авторизации на Мастере
@@ -15,6 +17,7 @@ type Config struct {
 	RealityKeyPath  string // Путь к локальному файлу с приватным reality-ключом
 	ContainerEngine string // 'podman' или 'docker' — определяется автоматически
 	ContainerName   string // Имя контейнера sing-box для restart
+	GhToken         string // GH_TOKEN для gh release download — используется и для self-update
 }
 
 func LoadConfig() *Config {
@@ -52,6 +55,7 @@ func LoadConfig() *Config {
 		RealityKeyPath:  realityKeyPath,
 		ContainerEngine: detectContainerEngine(),
 		ContainerName:   containerName,
+		GhToken:         os.Getenv("GH_TOKEN"),
 	}
 }
 

@@ -1,4 +1,4 @@
-use crate::models::{Node, User};
+use crate::models::{Node, PaymentCode, User};
 use chrono::NaiveDateTime;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -47,6 +47,12 @@ pub async fn get_all_users(pool: &PgPool) -> Result<Vec<User>, sqlx::Error> {
         .await
 }
 
+pub async fn get_free_users(pool: &PgPool) -> Result<Vec<User>, sqlx::Error> {
+    sqlx::query_as!(User, "SELECT * FROM users WHERE tier = 'free'")
+        .fetch_all(pool)
+        .await
+}
+
 pub async fn delete_user(pool: &PgPool, tg_id: i64) -> Result<u64, sqlx::Error> {
     let result = sqlx::query!("DELETE FROM users WHERE tg_id = $1", tg_id)
         .execute(pool)
@@ -59,10 +65,48 @@ pub async fn delete_user(pool: &PgPool, tg_id: i64) -> Result<u64, sqlx::Error> 
 // ПЛАТЕЖИ
 // -----------------------------------------------------------------
 
-pub async fn create_payment_request(pool: &PgPool, tg_id: i64) -> Result<i32, sqlx::Error> {
+// Код действует ровно один календарный день — это единственная причина
+// хранить его в payment_codes отдельно от payment_requests, а не генерировать
+// заявку сразу: пользователь может нажать "Оплатить" и передумать (кнопка
+// "Отмена"), и тогда заявка в vpn-core вообще не должна создаваться.
+pub async fn get_or_create_payment_code(pool: &PgPool, tg_id: i64) -> Result<String, sqlx::Error> {
+    let today = chrono::Local::now().date_naive();
+
+    if let Some(existing) = sqlx::query_as!(
+        PaymentCode,
+        "SELECT * FROM payment_codes WHERE tg_id = $1 AND code_date = $2",
+        tg_id,
+        today
+    )
+    .fetch_optional(pool)
+    .await?
+    {
+        return Ok(existing.code);
+    }
+
+    let code = Uuid::new_v4().simple().to_string()[..6].to_uppercase();
+
+    sqlx::query!(
+        "INSERT INTO payment_codes (tg_id, code_date, code) VALUES ($1, $2, $3)",
+        tg_id,
+        today,
+        code
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(code)
+}
+
+pub async fn create_payment_request(
+    pool: &PgPool,
+    tg_id: i64,
+    code: &str,
+) -> Result<i32, sqlx::Error> {
     let record = sqlx::query!(
-        "INSERT INTO payment_requests (tg_id, status) VALUES ($1, 'pending') RETURNING id",
-        tg_id
+        "INSERT INTO payment_requests (tg_id, status, code) VALUES ($1, 'pending', $2) RETURNING id",
+        tg_id,
+        code
     )
     .fetch_one(pool)
     .await?;

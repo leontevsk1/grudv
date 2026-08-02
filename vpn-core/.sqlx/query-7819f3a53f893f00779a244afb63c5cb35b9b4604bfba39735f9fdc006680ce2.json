@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO payment_requests (tg_id, status) VALUES ($1, 'pending') RETURNING id",
+  "query": "INSERT INTO payment_requests (tg_id, status, code) VALUES ($1, 'pending', $2) RETURNING id",
   "describe": {
     "columns": [
       {
@@ -11,12 +11,13 @@
     ],
     "parameters": {
       "Left": [
-        "Int8"
+        "Int8",
+        "Varchar"
       ]
     },
     "nullable": [
       false
     ]
   },
-  "hash": "5dec42ce06c4e577a7f66b268d625dbbeefe95ec70376b59f2aa13b9e225d0f7"
+  "hash": "7819f3a53f893f00779a244afb63c5cb35b9b4604bfba39735f9fdc006680ce2"
 }

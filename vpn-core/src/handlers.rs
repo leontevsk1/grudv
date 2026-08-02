@@ -76,6 +76,16 @@ pub fn build_sub_configs(user: &crate::models::User, node: &Node) -> Vec<String>
     configs
 }
 
+pub async fn health(State(state): State<AppState>) -> impl IntoResponse {
+    match sqlx::query("SELECT 1").execute(&state.db).await {
+        Ok(_) => StatusCode::OK.into_response(),
+        Err(e) => {
+            log::error!("Health-check: БД недоступна: {}", e);
+            StatusCode::SERVICE_UNAVAILABLE.into_response()
+        }
+    }
+}
+
 // -----------------------------------------------------------------
 // УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ (API для Бота)
 // -----------------------------------------------------------------
@@ -148,6 +158,24 @@ pub async fn get_user(
     }
 }
 
+pub async fn get_free_users(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let token = extract_bearer(&headers).unwrap_or_default();
+    if token != state.bot_secret {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+
+    match db::get_free_users(&state.db).await {
+        Ok(users) => (StatusCode::OK, Json(users)).into_response(),
+        Err(e) => {
+            log::error!("Ошибка выгрузки free-пользователей: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
 pub async fn delete_user(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -172,6 +200,25 @@ pub async fn delete_user(
 // ПЛАТЕЖИ (API для Бота/Админа)
 // -----------------------------------------------------------------
 
+pub async fn get_payment_code(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(tg_id): Path<i64>,
+) -> impl IntoResponse {
+    let token = extract_bearer(&headers).unwrap_or_default();
+    if token != state.bot_secret {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+
+    match db::get_or_create_payment_code(&state.db, tg_id).await {
+        Ok(code) => (StatusCode::OK, Json(serde_json::json!({ "code": code }))).into_response(),
+        Err(e) => {
+            log::error!("Ошибка получения кода оплаты: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
 pub async fn create_payment_request(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -182,7 +229,7 @@ pub async fn create_payment_request(
         return StatusCode::UNAUTHORIZED.into_response();
     }
 
-    match db::create_payment_request(&state.db, payload.tg_id).await {
+    match db::create_payment_request(&state.db, payload.tg_id, &payload.code).await {
         Ok(id) => (StatusCode::CREATED, Json(serde_json::json!({ "id": id }))).into_response(),
         Err(e) => {
             log::error!("Ошибка создания заявки на оплату: {}", e);

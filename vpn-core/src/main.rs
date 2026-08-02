@@ -44,13 +44,19 @@ async fn main() {
     };
 
     let app = Router::new()
+        .route("/health", get(handlers::health))
         // Управление пользователями (для бота)
         .route("/api/v1/users", post(handlers::upsert_user))
         .route(
             "/api/v1/users/{tg_id}",
             get(handlers::get_user).delete(handlers::delete_user),
         )
+        .route("/api/v1/free-users", get(handlers::get_free_users))
         // Управление заявками на оплату (для бота/админа)
+        .route(
+            "/api/v1/users/{tg_id}/payment-code",
+            get(handlers::get_payment_code),
+        )
         .route("/api/v1/payments", post(handlers::create_payment_request))
         .route(
             "/api/v1/payments/{id}/approve",

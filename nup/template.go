@@ -233,36 +233,59 @@ func buildInbound(ib InboundConfig, usersByID map[int64]MasterUser, localKeys *R
 	return inbound, nil
 }
 
+// Пустой UserIDs значит "все пользователи ноды" — так же, как вело себя
+// старое поведение до появления декларативного конфига. Явный список
+// нужен только когда оператор осознанно ограничивает inbound подмножеством.
+func inboundUsers(ib InboundConfig, usersByID map[int64]MasterUser) []MasterUser {
+	if len(ib.UserIDs) == 0 {
+		out := make([]MasterUser, 0, len(usersByID))
+		for _, u := range usersByID {
+			out = append(out, u)
+		}
+		return out
+	}
+
+	out := make([]MasterUser, 0, len(ib.UserIDs))
+	for _, id := range ib.UserIDs {
+		if u, ok := usersByID[id]; ok {
+			out = append(out, u)
+		}
+	}
+	return out
+}
+
 func buildInboundUsers(ib InboundConfig, usersByID map[int64]MasterUser) (any, error) {
+	users := inboundUsers(ib, usersByID)
+
 	switch ib.CredentialField {
 	case "vless":
 		var out []SingBoxUser
-		for _, id := range ib.UserIDs {
-			if u, ok := usersByID[id]; ok && u.VlessUUID != nil {
+		for _, u := range users {
+			if u.VlessUUID != nil {
 				out = append(out, SingBoxUser{Name: u.Tier, UUID: *u.VlessUUID, Flow: ib.ProtocolSettings.Flow})
 			}
 		}
 		return out, nil
 	case "hy2":
 		var out []SingBoxHy2User
-		for _, id := range ib.UserIDs {
-			if u, ok := usersByID[id]; ok && u.Hy2Password != nil {
+		for _, u := range users {
+			if u.Hy2Password != nil {
 				out = append(out, SingBoxHy2User{Name: u.Tier, Password: *u.Hy2Password})
 			}
 		}
 		return out, nil
 	case "tuic":
 		var out []SingBoxTuicUser
-		for _, id := range ib.UserIDs {
-			if u, ok := usersByID[id]; ok && u.TuicUUID != nil && u.TuicPassword != nil {
+		for _, u := range users {
+			if u.TuicUUID != nil && u.TuicPassword != nil {
 				out = append(out, SingBoxTuicUser{Name: u.Tier, UUID: *u.TuicUUID, Password: *u.TuicPassword})
 			}
 		}
 		return out, nil
 	case "naive":
 		var out []SingBoxNaiveUser
-		for _, id := range ib.UserIDs {
-			if u, ok := usersByID[id]; ok && u.NaiveUsername != nil && u.NaivePassword != nil {
+		for _, u := range users {
+			if u.NaiveUsername != nil && u.NaivePassword != nil {
 				out = append(out, SingBoxNaiveUser{Name: u.Tier, Username: *u.NaiveUsername, Password: *u.NaivePassword})
 			}
 		}

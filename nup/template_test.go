@@ -163,6 +163,27 @@ func assertRoutesByAuthUser(t *testing.T, raw []byte) {
 	}
 }
 
+func TestGenerateConfigEmptyUserIDsMeansAllUsers(t *testing.T) {
+	config := realityNodeConfig()
+	config.Inbounds[0].UserIDs = nil
+
+	data := &MasterConfigResponse{
+		Node:  MasterNode{NodeType: "reality", Config: config},
+		Users: testUsers(),
+	}
+
+	raw, err := GenerateConfig(data, testLocalKeys())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	inbounds := decodeInbounds(t, raw)
+	vlessUsers := inbounds[0]["users"].([]any)
+	if len(vlessUsers) != 2 {
+		t.Errorf("vless users = %d, want 2 (nil user_ids should include every user with vless creds)", len(vlessUsers))
+	}
+}
+
 func webNodeConfig() *NodeConfig {
 	return &NodeConfig{
 		Version:  1,

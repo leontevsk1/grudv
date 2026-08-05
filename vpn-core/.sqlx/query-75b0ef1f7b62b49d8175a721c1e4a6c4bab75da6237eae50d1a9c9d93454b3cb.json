@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM nodes WHERE id = $1",
+  "query": "SELECT id, name, address, node_type, status, join_token, reality_pub_key,\n            reality_short_id, obfs_password, upstream_node_id,\n            config as \"config: Json<NodeConfig>\"\n        FROM nodes WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -52,6 +52,11 @@
         "ordinal": 9,
         "name": "upstream_node_id",
         "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "config: Json<NodeConfig>",
+        "type_info": "Jsonb"
       }
     ],
     "parameters": {
@@ -69,8 +74,9 @@
       true,
       true,
       true,
+      true,
       true
     ]
   },
-  "hash": "992b1bdf4d8b823103271735e261c0d8ad97933954e09e7e2a5a983bb4353571"
+  "hash": "75b0ef1f7b62b49d8175a721c1e4a6c4bab75da6237eae50d1a9c9d93454b3cb"
 }

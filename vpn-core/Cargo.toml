@@ -11,6 +11,7 @@ sqlx = { version = "0.8.1", default-features = false, features = [
     "migrate",
     "chrono",
     "uuid",
+    "json",
 ] }
 sha1 = "0.11.0"
 hex = "0.4.3"

@@ -11,7 +11,10 @@ use uuid::Uuid;
 
 use crate::{
     db,
-    models::{Node, NodeCreateRequest, NodeKeysRequest, NupConfigResponse, UserUpsertRequest},
+    models::{
+        Node, NodeConfig, NodeCreateRequest, NodeKeysRequest, NupConfigResponse, TlsMode,
+        UserUpsertRequest,
+    },
 };
 
 #[derive(Clone)]
@@ -38,26 +41,37 @@ const REALITY_SNI: &str = "telemetry.mozilla.org";
 pub fn build_sub_configs(user: &crate::models::User, node: &Node) -> Vec<String> {
     let mut configs = Vec::new();
 
-    match node.node_type.as_str() {
-        "reality" | "relay" => {
-            if let (Some(pbk), Some(sid)) = (&node.reality_pub_key, &node.reality_short_id) {
-                configs.push(format!(
-                    "vless://{}@{}:443?encryption=none&security=reality&type=tcp&flow=xtls-rprx-vision&sni={}&fp=chrome&pbk={}&sid={}",
-                    user.vless_uuid.unwrap_or_default(),
-                    node.address,
-                    REALITY_SNI,
-                    pbk,
-                    sid
-                ));
-            }
-        }
-        _ => {
+    // relay ещё не переведён на декларативный config (см. buildRelayConfig в
+    // nup/template.go) — для него признак reality-vs-httpupgrade остаётся
+    // node_type. Для reality/web источник истины — сам JSONB-конфиг узла,
+    // чтобы ссылка не могла разъехаться с тем, что реально сгенерировал nup.
+    let is_reality = if node.node_type == "relay" {
+        true
+    } else {
+        node.config.as_ref().is_some_and(|c| {
+            c.inbounds
+                .iter()
+                .any(|ib| matches!(&ib.tls, Some(tls) if tls.mode == TlsMode::Reality))
+        })
+    };
+
+    if is_reality {
+        if let (Some(pbk), Some(sid)) = (&node.reality_pub_key, &node.reality_short_id) {
             configs.push(format!(
-                "vless://{}@{}:443?encryption=none&security=tls&type=httpupgrade&path=/your-secret-health-path",
+                "vless://{}@{}:443?encryption=none&security=reality&type=tcp&flow=xtls-rprx-vision&sni={}&fp=chrome&pbk={}&sid={}",
                 user.vless_uuid.unwrap_or_default(),
-                node.address
+                node.address,
+                REALITY_SNI,
+                pbk,
+                sid
             ));
         }
+    } else {
+        configs.push(format!(
+            "vless://{}@{}:443?encryption=none&security=tls&type=httpupgrade&path=/your-secret-health-path",
+            user.vless_uuid.unwrap_or_default(),
+            node.address
+        ));
     }
 
     if let Some(hy2_pass) = &user.hy2_password {
@@ -351,6 +365,104 @@ pub async fn delete_node(
 }
 
 // -----------------------------------------------------------------
+// ДЕКЛАРАТИВНАЯ КОНФИГУРАЦИЯ УЗЛА (API для оператора/TUI)
+// -----------------------------------------------------------------
+
+pub async fn get_node_config(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<i32>,
+) -> impl IntoResponse {
+    let token = extract_bearer(&headers).unwrap_or_default();
+    if token != state.bot_secret {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+
+    match db::get_node_config(&state.db, id).await {
+        Ok(Some(config)) => (StatusCode::OK, Json(config.0)).into_response(),
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(e) => {
+            log::error!("Ошибка запроса конфигурации узла: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
+pub async fn put_node_config(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<i32>,
+    Json(payload): Json<NodeConfig>,
+) -> impl IntoResponse {
+    let token = extract_bearer(&headers).unwrap_or_default();
+    if token != state.bot_secret {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+
+    if let Err(msg) = validate_node_config(&payload) {
+        return (StatusCode::UNPROCESSABLE_ENTITY, msg).into_response();
+    }
+
+    match db::update_node_config(&state.db, id, &payload).await {
+        Ok(rows) if rows > 0 => StatusCode::OK.into_response(),
+        Ok(_) => StatusCode::NOT_FOUND.into_response(),
+        Err(e) => {
+            log::error!("Ошибка сохранения конфигурации узла: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
+// Serde уже проверил форму каждого объекта — здесь только ссылочная
+// целостность между ними (тег существует, теги уникальны), которую
+// serde сама по себе выразить не может.
+fn validate_node_config(config: &NodeConfig) -> Result<(), String> {
+    let mut tags = std::collections::HashSet::new();
+    for tag in config
+        .inbounds
+        .iter()
+        .map(|i| &i.tag)
+        .chain(config.outbounds.iter().map(|o| &o.tag))
+    {
+        if !tags.insert(tag) {
+            return Err(format!("duplicate tag: {}", tag));
+        }
+    }
+
+    if !tags.contains(&config.route.final_outbound) {
+        return Err(format!(
+            "route.final references unknown outbound tag: {}",
+            config.route.final_outbound
+        ));
+    }
+
+    for rule in &config.route.rules {
+        if let Some(outbound) = rule.get("outbound").and_then(|v| v.as_str())
+            && !tags.contains(&outbound.to_string())
+        {
+            return Err(format!(
+                "route rule references unknown outbound tag: {}",
+                outbound
+            ));
+        }
+        if let Some(inbounds) = rule.get("inbound").and_then(|v| v.as_array()) {
+            for ib in inbounds {
+                if let Some(ib_tag) = ib.as_str()
+                    && !tags.contains(&ib_tag.to_string())
+                {
+                    return Err(format!(
+                        "route rule references unknown inbound tag: {}",
+                        ib_tag
+                    ));
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// -----------------------------------------------------------------
 // КОНФИГУРАЦИЯ (Pull-модель для nup)
 // -----------------------------------------------------------------
 
@@ -371,6 +483,16 @@ pub async fn get_nup_config(
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     };
+
+    // relay пока не переведён на декларативный конфиг (см. buildRelayConfig
+    // в nup/template.go) — только reality/web обязаны иметь nodes.config.
+    if node.node_type != "relay" && node.config.is_none() {
+        return (
+            StatusCode::CONFLICT,
+            "node has no declarative config yet, configure via PUT /api/v1/nodes/{id}/config",
+        )
+            .into_response();
+    }
 
     let users = match db::get_all_users(&state.db).await {
         Ok(u) => u,

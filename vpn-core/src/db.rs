@@ -1,6 +1,7 @@
-use crate::models::{Node, PaymentCode, User};
+use crate::models::{Node, NodeConfig, PaymentCode, User};
 use chrono::NaiveDateTime;
 use sqlx::PgPool;
+use sqlx::types::Json;
 use uuid::Uuid;
 
 // -----------------------------------------------------------------
@@ -166,7 +167,9 @@ pub async fn create_node(
             upstream_node_id = EXCLUDED.upstream_node_id,
             reality_pub_key = NULL,
             reality_short_id = NULL
-        RETURNING *
+        RETURNING id, name, address, node_type, status, join_token, reality_pub_key,
+            reality_short_id, obfs_password, upstream_node_id,
+            config as "config: Json<NodeConfig>"
         "#,
         name,
         address,
@@ -210,7 +213,10 @@ pub async fn get_node_by_token(
 ) -> Result<Option<Node>, sqlx::Error> {
     sqlx::query_as!(
         Node,
-        "SELECT * FROM nodes WHERE join_token = $1",
+        r#"SELECT id, name, address, node_type, status, join_token, reality_pub_key,
+            reality_short_id, obfs_password, upstream_node_id,
+            config as "config: Json<NodeConfig>"
+        FROM nodes WHERE join_token = $1"#,
         join_token
     )
     .fetch_optional(pool)
@@ -218,13 +224,53 @@ pub async fn get_node_by_token(
 }
 
 pub async fn get_node_by_id(pool: &PgPool, id: i32) -> Result<Option<Node>, sqlx::Error> {
-    sqlx::query_as!(Node, "SELECT * FROM nodes WHERE id = $1", id)
-        .fetch_optional(pool)
-        .await
+    sqlx::query_as!(
+        Node,
+        r#"SELECT id, name, address, node_type, status, join_token, reality_pub_key,
+            reality_short_id, obfs_password, upstream_node_id,
+            config as "config: Json<NodeConfig>"
+        FROM nodes WHERE id = $1"#,
+        id
+    )
+    .fetch_optional(pool)
+    .await
 }
 
 pub async fn get_all_nodes(pool: &PgPool) -> Result<Vec<Node>, sqlx::Error> {
-    sqlx::query_as!(Node, "SELECT * FROM nodes WHERE status = 'active'")
-        .fetch_all(pool)
-        .await
+    sqlx::query_as!(
+        Node,
+        r#"SELECT id, name, address, node_type, status, join_token, reality_pub_key,
+            reality_short_id, obfs_password, upstream_node_id,
+            config as "config: Json<NodeConfig>"
+        FROM nodes WHERE status = 'active'"#
+    )
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn get_node_config(
+    pool: &PgPool,
+    id: i32,
+) -> Result<Option<Json<NodeConfig>>, sqlx::Error> {
+    let record = sqlx::query!("SELECT config as \"config: Json<NodeConfig>\" FROM nodes WHERE id = $1", id)
+        .fetch_optional(pool)
+        .await?;
+
+    Ok(record.and_then(|r| r.config))
+}
+
+pub async fn update_node_config(
+    pool: &PgPool,
+    id: i32,
+    config: &NodeConfig,
+) -> Result<u64, sqlx::Error> {
+    let result = sqlx::query!(
+        "UPDATE nodes SET config = $1 WHERE id = $2",
+        serde_json::to_value(config).expect("NodeConfig always serializes"),
+        id
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected())
 }

@@ -50,6 +50,25 @@ func main() {
 	}
 }
 
+// needsCertSync определяет, нужен ли этой ноде сертификат от Caddy/certbot.
+// relay всегда его использует (см. buildRelayConfig); reality/web — только
+// если оператор явно объявил в config хотя бы один tls.mode=="cert" inbound
+// (hysteria2/tuic сегодня), независимо от NodeType.
+func needsCertSync(data *MasterConfigResponse) bool {
+	if data.Node.NodeType == "relay" {
+		return true
+	}
+	if data.Node.Config == nil {
+		return false
+	}
+	for _, ib := range data.Node.Config.Inbounds {
+		if ib.TLS != nil && ib.TLS.Mode == "cert" {
+			return true
+		}
+	}
+	return false
+}
+
 func runSelfUpdateLoop(cfg *Config) {
 	ticker := time.NewTicker(12 * time.Hour)
 	defer ticker.Stop()
@@ -103,9 +122,12 @@ func fetchAndApplyConfig(cfg *Config, localKeys *RealityLocalKeys) {
 		return
 	}
 
-	certChanged, err := SyncCertificate(cfg.NodeType, cfg.Domain)
-	if err != nil {
-		log.Printf("Ошибка синхронизации TLS-сертификата от Caddy: %v", err)
+	var certChanged bool
+	if needsCertSync(&masterData) {
+		certChanged, err = SyncCertificate(cfg.NodeType, cfg.Domain)
+		if err != nil {
+			log.Printf("Ошибка синхронизации TLS-сертификата от Caddy: %v", err)
+		}
 	}
 
 	configPath := cfg.ConfigPath

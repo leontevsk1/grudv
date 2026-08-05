@@ -39,6 +39,102 @@ pub struct Node {
     pub reality_short_id: Option<String>,
     pub obfs_password: Option<String>,
     pub upstream_node_id: Option<i32>,
+    pub config: Option<sqlx::types::Json<NodeConfig>>,
+}
+
+// -----------------------------------------------------------------
+// ДЕКЛАРАТИВНАЯ КОНФИГУРАЦИЯ УЗЛА (JSONB, nodes.config)
+// -----------------------------------------------------------------
+// Описывает форму sing-box конфига (inbounds/outbounds/route) для узлов
+// reality/web. Секреты (reality private_key, TLS-сертификаты) сюда не
+// попадают никогда — их подставляет nup локально post-hoc. relay-узлы
+// эту схему пока не используют (см. buildRelayConfig в nup/template.go).
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct NodeConfig {
+    pub version: i32,
+    pub log_level: String,
+    pub inbounds: Vec<InboundConfig>,
+    pub outbounds: Vec<OutboundConfig>,
+    pub route: RouteConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct InboundConfig {
+    pub tag: String,
+    #[serde(rename = "type")]
+    pub inbound_type: String,
+    pub listen: String,
+    pub listen_port: u16,
+    #[serde(default)]
+    pub protocol_settings: ProtocolSettings,
+    #[serde(default)]
+    pub transport: Option<TransportConfig>,
+    #[serde(default)]
+    pub tls: Option<TlsConfig>,
+    pub user_ids: Vec<i64>,
+    pub credential_field: CredentialField,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(deny_unknown_fields)]
+pub struct ProtocolSettings {
+    #[serde(default)]
+    pub flow: Option<String>,
+    #[serde(default)]
+    pub congestion_control: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+pub enum TransportConfig {
+    Httpupgrade { path: String },
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct TlsConfig {
+    pub mode: TlsMode,
+    #[serde(default)]
+    pub server_name: Option<String>,
+    #[serde(default)]
+    pub alpn: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum TlsMode {
+    Cert,
+    Reality,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum CredentialField {
+    Vless,
+    Hy2,
+    Tuic,
+    Naive,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct OutboundConfig {
+    pub tag: String,
+    #[serde(rename = "type")]
+    pub outbound_type: String,
+    #[serde(default)]
+    pub routing_mark: Option<i32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct RouteConfig {
+    pub rules: Vec<serde_json::Value>,
+    #[serde(rename = "final")]
+    pub final_outbound: String,
 }
 
 

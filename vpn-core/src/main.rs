@@ -69,6 +69,10 @@ async fn main() {
         // Управление узлами (для бота/админа)
         .route("/api/v1/nodes", post(handlers::create_node))
         .route("/api/v1/nodes/{id}", delete(handlers::delete_node))
+        .route(
+            "/api/v1/nodes/{id}/config",
+            get(handlers::get_node_config).put(handlers::put_node_config),
+        )
         // Pull-конфигурация (для nup)
         .route("/api/v1/nup/config", get(handlers::get_nup_config))
         .route("/api/v1/nup/node-keys", post(handlers::set_node_keys))

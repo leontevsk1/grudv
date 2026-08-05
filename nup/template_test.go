@@ -27,6 +27,8 @@ func testUsers() []MasterUser {
 	}
 }
 
+func testUserIDs() []int64 { return []int64{1, 2} }
+
 func decodeInbounds(t *testing.T, raw []byte) []map[string]any {
 	t.Helper()
 	var config map[string]any
@@ -52,9 +54,53 @@ func testLocalKeys() *RealityLocalKeys {
 	}
 }
 
+func realityNodeConfig() *NodeConfig {
+	return &NodeConfig{
+		Version:  1,
+		LogLevel: "info",
+		Inbounds: []InboundConfig{
+			{
+				Tag: "in-vless-reality", Type: "vless", Listen: "::", ListenPort: 443,
+				ProtocolSettings: ProtocolSettings{Flow: "xtls-rprx-vision"},
+				TLS:              &TLSConfig{Mode: "reality", ServerName: "telemetry.mozilla.org"},
+				UserIDs:          testUserIDs(),
+				CredentialField:  "vless",
+			},
+			{
+				Tag: "in-hysteria2", Type: "hysteria2", Listen: "::", ListenPort: 8443,
+				TLS:             &TLSConfig{Mode: "cert", Alpn: []string{"h3"}},
+				UserIDs:         testUserIDs(),
+				CredentialField: "hy2",
+			},
+			{
+				Tag: "in-tuic", Type: "tuic", Listen: "::", ListenPort: 443,
+				ProtocolSettings: ProtocolSettings{CongestionControl: "bbr"},
+				TLS:              &TLSConfig{Mode: "cert", Alpn: []string{"h3"}},
+				UserIDs:          testUserIDs(),
+				CredentialField:  "tuic",
+			},
+		},
+		Outbounds: []OutboundConfig{
+			{Tag: "Direct-Premium", Type: "direct"},
+			{Tag: "Direct-Free", Type: "direct", RoutingMark: intPtr(100)},
+			{Tag: "Block", Type: "block"},
+		},
+		Route: RouteConfig{
+			Rules: []map[string]any{
+				{"ip_is_private": true, "action": "route", "outbound": "Block"},
+				{"auth_user": []string{"premium"}, "action": "route", "outbound": "Direct-Premium"},
+				{"auth_user": []string{"free"}, "action": "route", "outbound": "Direct-Free"},
+			},
+			Final: "Block",
+		},
+	}
+}
+
+func intPtr(i int) *int { return &i }
+
 func TestGenerateConfigReality(t *testing.T) {
 	data := &MasterConfigResponse{
-		Node:  MasterNode{NodeType: "reality"},
+		Node:  MasterNode{NodeType: "reality", Config: realityNodeConfig()},
 		Users: testUsers(),
 	}
 
@@ -81,6 +127,11 @@ func TestGenerateConfigReality(t *testing.T) {
 	tuicUsers := inbounds[2]["users"].([]any)
 	if len(tuicUsers) != 1 {
 		t.Errorf("tuic users = %d, want 1 (only premium has tuic creds)", len(tuicUsers))
+	}
+
+	reality := inbounds[0]["tls"].(map[string]any)["reality"].(map[string]any)
+	if reality["private_key"] != "local-private-key" {
+		t.Errorf("reality.private_key = %v, want local-private-key", reality["private_key"])
 	}
 
 	assertRoutesByAuthUser(t, raw)
@@ -112,9 +163,55 @@ func assertRoutesByAuthUser(t *testing.T, raw []byte) {
 	}
 }
 
+func webNodeConfig() *NodeConfig {
+	return &NodeConfig{
+		Version:  1,
+		LogLevel: "info",
+		Inbounds: []InboundConfig{
+			{
+				Tag: "in-vless-xhttp", Type: "vless", Listen: "127.0.0.1", ListenPort: 2026,
+				Transport:       &TransportConfig{Type: "httpupgrade", Path: "/your-secret-health-path"},
+				UserIDs:         testUserIDs(),
+				CredentialField: "vless",
+			},
+			{
+				Tag: "in-naive", Type: "naive", Listen: "127.0.0.1", ListenPort: 2027,
+				UserIDs:         testUserIDs(),
+				CredentialField: "naive",
+			},
+			{
+				Tag: "in-hysteria2", Type: "hysteria2", Listen: "::", ListenPort: 8443,
+				TLS:             &TLSConfig{Mode: "cert", Alpn: []string{"h3"}},
+				UserIDs:         testUserIDs(),
+				CredentialField: "hy2",
+			},
+			{
+				Tag: "in-tuic", Type: "tuic", Listen: "::", ListenPort: 443,
+				ProtocolSettings: ProtocolSettings{CongestionControl: "bbr"},
+				TLS:              &TLSConfig{Mode: "cert", Alpn: []string{"h3"}},
+				UserIDs:          testUserIDs(),
+				CredentialField:  "tuic",
+			},
+		},
+		Outbounds: []OutboundConfig{
+			{Tag: "Direct-Premium", Type: "direct"},
+			{Tag: "Direct-Free", Type: "direct", RoutingMark: intPtr(100)},
+			{Tag: "Block", Type: "block"},
+		},
+		Route: RouteConfig{
+			Rules: []map[string]any{
+				{"ip_is_private": true, "action": "route", "outbound": "Block"},
+				{"auth_user": []string{"premium"}, "action": "route", "outbound": "Direct-Premium"},
+				{"auth_user": []string{"free"}, "action": "route", "outbound": "Direct-Free"},
+			},
+			Final: "Block",
+		},
+	}
+}
+
 func TestGenerateConfigWeb(t *testing.T) {
 	data := &MasterConfigResponse{
-		Node:  MasterNode{NodeType: "web"},
+		Node:  MasterNode{NodeType: "web", Config: webNodeConfig()},
 		Users: testUsers(),
 	}
 
@@ -134,6 +231,32 @@ func TestGenerateConfigWeb(t *testing.T) {
 	}
 
 	assertRoutesByAuthUser(t, raw)
+}
+
+func TestGenerateConfigMissingDeclarativeConfig(t *testing.T) {
+	data := &MasterConfigResponse{
+		Node:  MasterNode{NodeType: "reality", Config: nil},
+		Users: testUsers(),
+	}
+
+	_, err := GenerateConfig(data, testLocalKeys())
+	if err == nil {
+		t.Fatal("expected error when reality node has no declarative config, got nil")
+	}
+}
+
+func TestGenerateConfigUnsupportedVersion(t *testing.T) {
+	cfg := realityNodeConfig()
+	cfg.Version = 2
+	data := &MasterConfigResponse{
+		Node:  MasterNode{NodeType: "reality", Config: cfg},
+		Users: testUsers(),
+	}
+
+	_, err := GenerateConfig(data, testLocalKeys())
+	if err == nil {
+		t.Fatal("expected error for unsupported config version, got nil")
+	}
 }
 
 func TestGenerateConfigRelayRequiresUpstream(t *testing.T) {

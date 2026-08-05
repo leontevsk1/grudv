@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        INSERT INTO nodes (name, address, node_type, status, join_token, upstream_node_id)\n        VALUES ($1, $2, $3, 'active', $4, $5)\n        ON CONFLICT (name) DO UPDATE SET\n            address = EXCLUDED.address,\n            node_type = EXCLUDED.node_type,\n            status = 'active',\n            join_token = EXCLUDED.join_token,\n            upstream_node_id = EXCLUDED.upstream_node_id,\n            reality_pub_key = NULL,\n            reality_short_id = NULL\n        RETURNING *\n        ",
+  "query": "SELECT id, name, address, node_type, status, join_token, reality_pub_key,\n            reality_short_id, obfs_password, upstream_node_id,\n            config as \"config: Json<NodeConfig>\"\n        FROM nodes WHERE status = 'active'",
   "describe": {
     "columns": [
       {
@@ -52,16 +52,15 @@
         "ordinal": 9,
         "name": "upstream_node_id",
         "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "config: Json<NodeConfig>",
+        "type_info": "Jsonb"
       }
     ],
     "parameters": {
-      "Left": [
-        "Varchar",
-        "Varchar",
-        "Varchar",
-        "Varchar",
-        "Int4"
-      ]
+      "Left": []
     },
     "nullable": [
       false,
@@ -73,8 +72,9 @@
       true,
       true,
       true,
+      true,
       true
     ]
   },
-  "hash": "15e8e49094a13a52b34e6de0d0d419fa5638f249f61481219aa00a3fad152954"
+  "hash": "6d0e37f5ecf7e3fe401dbc920919ed795212b4cd16f78bc8c22431df38a1d319"
 }

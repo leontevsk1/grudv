@@ -1,5 +1,8 @@
 use crate::handlers::{build_sub_configs, extract_bearer};
-use crate::models::{Node, User};
+use crate::models::{
+    CredentialField, InboundConfig, Node, NodeConfig, OutboundConfig, ProtocolSettings,
+    RouteConfig, TlsConfig, TlsMode, User,
+};
 use axum::http::{HeaderMap, HeaderValue};
 use uuid::Uuid;
 
@@ -17,7 +20,52 @@ fn make_user(tier: &str) -> User {
     }
 }
 
+fn make_tls_inbound(mode: TlsMode) -> InboundConfig {
+    InboundConfig {
+        tag: "in-vless".to_string(),
+        inbound_type: "vless".to_string(),
+        listen: "::".to_string(),
+        listen_port: 443,
+        protocol_settings: ProtocolSettings::default(),
+        transport: None,
+        tls: Some(TlsConfig {
+            mode,
+            server_name: Some("telemetry.mozilla.org".to_string()),
+            alpn: None,
+        }),
+        user_ids: vec![],
+        credential_field: CredentialField::Vless,
+    }
+}
+
+// node_type здесь используется только как признак relay (не переведён на
+// декларативный конфиг); reality/web различаются наличием tls.mode в config,
+// см. build_sub_configs.
 fn make_node(node_type: &str) -> Node {
+    let config = if node_type == "relay" {
+        None
+    } else {
+        let mode = if node_type == "reality" {
+            TlsMode::Reality
+        } else {
+            TlsMode::Cert
+        };
+        Some(sqlx::types::Json(NodeConfig {
+            version: 1,
+            log_level: "info".to_string(),
+            inbounds: vec![make_tls_inbound(mode)],
+            outbounds: vec![OutboundConfig {
+                tag: "Block".to_string(),
+                outbound_type: "block".to_string(),
+                routing_mark: None,
+            }],
+            route: RouteConfig {
+                rules: vec![],
+                final_outbound: "Block".to_string(),
+            },
+        }))
+    };
+
     Node {
         id: 1,
         name: "node".to_string(),
@@ -29,6 +77,7 @@ fn make_node(node_type: &str) -> Node {
         reality_short_id: Some("shortid".to_string()),
         obfs_password: None,
         upstream_node_id: None,
+        config,
     }
 }
 

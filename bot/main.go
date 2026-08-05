@@ -66,15 +66,26 @@ func main() {
 		// 2. Обработка текстовых команд
 		switch msg.Text {
 		case "/start":
-			// По ТЗ при старте создаем пользователя со статусом free
-			err := core.CreateUser(chatID, "free")
+			// upsert_user на мастере не защищён от даунгрейда premium->free,
+			// так что /start не должен трогать уже существующего пользователя —
+			// иначе повторное нажатие "Start" сбрасывает оплаченный тариф.
+			existingUser, err := core.GetUser(chatID)
 			if err != nil {
-				log.Printf("Ошибка авторегистрации юзера %d: %v", chatID, err)
+				log.Printf("Ошибка проверки пользователя %d: %v", chatID, err)
 				bot.Send(tgbotapi.NewMessage(chatID, "Ошибка регистрации в системе."))
 				continue
 			}
+			reply := "Добро пожаловать в grudv!\nВаш аккаунт зарегистрирован на бесплатном (замедленном) тарифе.\n\nИспользуйте /info для получения ключей."
+			if existingUser == nil {
+				if err := core.CreateUser(chatID, "free"); err != nil {
+					log.Printf("Ошибка авторегистрации юзера %d: %v", chatID, err)
+					bot.Send(tgbotapi.NewMessage(chatID, "Ошибка регистрации в системе."))
+					continue
+				}
+			} else {
+				reply = "С возвращением!\n\nИспользуйте /info для получения ключей."
+			}
 
-			reply := "Добро пожаловать в GradVPN!\nВаш аккаунт зарегистрирован на бесплатном (замедленном) тарифе.\n\nИспользуйте /info для получения ключей."
 			startMsg := tgbotapi.NewMessage(chatID, reply)
 			startMsg.ReplyMarkup = tgbotapi.NewReplyKeyboard(
 				tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Оплатить")),
@@ -93,7 +104,7 @@ func main() {
 			if user.ExpireAt != nil {
 				sb.WriteString(fmt.Sprintf("Активен до: %s\n", *user.ExpireAt))
 			} else if user.Tier == "free" {
-				sb.WriteString("⚠️ Трафик искусственно замедлен ядрами Linux (tc троттлинг). Оплатите Premium для высокой скорости.\n")
+				sb.WriteString("⚠️ Трафик искусственно замедлен. Оплатите Premium для высокой скорости.\n")
 			}
 
 			sb.WriteString(fmt.Sprintf("\nСсылка на подписку:\n`%s/api/sub/%d`\n", core.MasterURL, chatID))
